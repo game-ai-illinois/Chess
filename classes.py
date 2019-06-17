@@ -7,26 +7,29 @@ class State:
 
 
 
+
 class Node:
     """
     A Node class that represents a node in a MCTS as stated in the paper
     "Mastering the game of Go without human knowledge"
     """
-    def __init__(self):
+    def __init__(self, state, NN):
+        self.state_ = state # state of the chess env
         self.N_ = 0.0 # count
-        self.W_ = 0.0
+        self.W_ = 0.0 # total action value
         self.Q_ = 0.0 # action value
         self.P_ = 0.0 # prior probability
         self.prevNode_ = None # previous node variable for backtracking
         self.children_ = [] # list of children nodes
-   
+
+
     def getChildren(self, env):
         '''
         obtains all the children nodes from interacting with the chess env
         '''
         possible_child_nodes =[]
         self.children_ = possible_child_nodes
-    
+
     def backTrack(self, value):
         '''
         recursive backtracking method for MCTS
@@ -63,3 +66,13 @@ class NN:
         '''
         runs the network with data (analogous to "testing")
         '''
+        P = None
+        V = None
+        return P, V
+
+    def getP(self, state):
+        '''
+        uses the Neural Network to obtain the prior probability (P) for MCTS
+        '''
+        P, V = self.run(state)
+        return P
