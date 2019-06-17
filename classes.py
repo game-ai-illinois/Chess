@@ -13,18 +13,37 @@ class Node:
     "Mastering the game of Go without human knowledge"
     """
     def __init__(self):
-        self.N_ = 0.0
+        self.N_ = 0.0 # count
         self.W_ = 0.0
-        self.Q_ = 0.0
-        self.P_ = 0.0
-        self.prevNode = None # previous node variable for backtracking
-
+        self.Q_ = 0.0 # action value
+        self.P_ = 0.0 # prior probability
+        self.prevNode_ = None # previous node variable for backtracking
+        self.children_ = [] # list of children nodes
+   
     def getChildren(self, env):
         '''
         obtains all the children nodes from interacting with the chess env
         '''
-    def simulation(self):
-        '''the
+        possible_child_nodes =[]
+        self.children_ = possible_child_nodes
+    
+    def backTrack(self, value):
+        '''
+        recursive backtracking method for MCTS
+        '''
+        self.N_ +=1
+        self.W_ += value
+        self.Q_ = self.W_ /self.N_
+        if self.prevNode_ != None:
+            self.prevNode_.backTrack(value)
+
+    def takeAction(self):
+        '''
+        from the given parameters pick a child node to traverse to
+        '''
+
+    def runSimulation(self):
+        '''
         runs MCTS simulation once
         '''
 
