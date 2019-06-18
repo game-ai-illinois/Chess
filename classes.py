@@ -67,10 +67,19 @@ class Node:
         selected_child = np.argmax(Q+U)
         return selected_child
 
-    def runSimulation(self):
+    def runSimulation(self, remain_iter):
         '''
         runs MCTS simulation once
+        remain_iter argument gives remaining number of simulations iterations
+        that we still need to do. The number is decremented by one everytime 
+        a simulation goes to the next child node
         '''
+        if remainIter == 0: #last node. This means we have to decide the winner
+        else:
+            next_node = self.select()
+            next_node.prevNode_ = self
+            next_remain_iter = remain_iter - 1
+            next_node.runSimulation(next_remain_iter)
 
 
 class NN:
