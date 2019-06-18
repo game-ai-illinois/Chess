@@ -86,13 +86,20 @@ class Node:
             next_node.runSimulation(next_remain_iter)
 
 
-    def pickMove(self):
+    def pickMove(self, temp):
         '''
         Makes a move and picks the next node (state) to go to
         '''
-        # next_move_child =
-        self.children_ = None # frees not picked children to be deleted
-        # still not sure if this is a valid way to free up memory
+        N_vector = [] # vector of N^(1/temp) values of all children
+        for child in self.children_:
+            N_vector.append(child.N_**(1/temp))
+        N_vector = np.array([N_vector]) # make it np array
+        N_vector = N_vector/np.sum(N_vector) # normalize to make it a probability distribution
+        next_move_idx = np.random.choice([i in range(N_vector.shape[0])], p = N_vector)
+        # next_move_arg picks the index of the N_vector according to its probability distribution
+        next_move_child = self.children_[next_move_idx] # picks the next child
+        self.children_ = None # frees not picked children to be deleted \
+        # still not sure if this is a valid way to free up memory however
         next_move_child.prevNode_ = None #the child is now root node
         return next_move_child
 
