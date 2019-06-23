@@ -1,4 +1,6 @@
 import numpy as np
+import torch
+import torch.nn as nn
 
 #TO DO: add virtual loss variable in backup see pg.22
 class State:
@@ -103,12 +105,21 @@ class Node:
         next_move_child.prevNode_ = None #the child is now root node
         return next_move_child
 
-class NN:
+def res_block(input_size, output_size):
+     return nn.Sequential(
+        # conv layer
+        nn.BatchNorm2d(out_f),# batch normalization
+        nn.ReLU(),
+        # conv layer
+        # batch normalization
+    )
+
+class NN(nn.Module):
     """
     A Neural Network Class that plays the role of the neural network function
     in the paper "Mastering the game of Go without human knowledge"
     """
-    def __init__(self):
+    def __init__(self, input_size):
 
 
     def train(self, train_data):
