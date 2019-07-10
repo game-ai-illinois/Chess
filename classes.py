@@ -105,13 +105,22 @@ class Node:
         next_move_child.prevNode_ = None #the child is now root node
         return next_move_child
 
-def res_block(input_size, output_size):
-     return nn.Sequential(
-        # conv layer
-        nn.BatchNorm2d(out_f),# batch normalization
+def res_block(input_size):
+    block= nn.Sequential(
+        nn.Conv2d(input_size,256, [3,3])# filters = output_size
+        nn.BatchNorm2d(),# batch normalization
         nn.ReLU(),
-        # conv layer
-        # batch normalization
+        nn.Conv2d(input_size, 256, [3,3])# filters = output_size
+        nn.BatchNorm2d(),# batch normalization
+        nn.ReLU(),
+    )
+    return nn.ReLU(input + block(input))
+
+def conv_block(input_size):
+    return nn.Sequential(
+        nn.Conv2d(input_size,256, [3,3])# filters = output_size
+        nn.BatchNorm2d(),# batch normalization
+        nn.ReLU(),
     )
 
 class NN(nn.Module):
@@ -120,7 +129,16 @@ class NN(nn.Module):
     in the paper "Mastering the game of Go without human knowledge"
     """
     def __init__(self, input_size):
-
+        self.conv_block_ = conv_block(input_size)
+        self.res_block0_ = res_block(input_size)
+        self.res_block1_ = res_block(input_size)
+        self.res_block2_ = res_block(input_size)
+        self.res_block3_ = res_block(input_size)
+        self.res_block4_ = res_block(input_size)
+        self.res_block5_ = res_block(input_size)
+        self.res_block6_ = res_block(input_size)
+        self.res_block7_ = res_block(input_size)
+        self.res_block8_ = res_block(input_size)
 
     def train(self, train_data):
         '''
@@ -128,7 +146,7 @@ class NN(nn.Module):
         '''
     def run(self. data):
         '''
-        runs the network with data (analogous to "testing") to obtain
+        runs the network with data (analogous to "forward") to obtain
         policy (P), a vector quantity, and value (V), a scalar quantity
         '''
         P = None
@@ -137,14 +155,14 @@ class NN(nn.Module):
 
     def getP(self, state):
         '''
-        uses the Neural Network to obtain the prior probability (P) for MCTS
+        runs the network with data (analogous to "forward") to obtain prior probability (P) for MCTS
         '''
         P, V = self.run(state)
         return P
 
     def getV(self, state):
         '''
-        uses the Neural Network to obtain the value (V) of the state for MCTS
+        runs the network with data (analogous to "forward") to obtain the value (V) of the state for MCTS
         '''
         P, V = self.run(state)
         return V
