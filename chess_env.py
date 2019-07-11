@@ -134,6 +134,9 @@ and then the direction of the traverse. if the order of: 64 nodes (8 by 8 chess 
 [1 to 7], and [N,NE,E,SE,S,SW,W,NW]
 ie, first 64 nodes all correspond to moving one square in the N direction. Then the next 64 correspond to 
 moving two squares in N direction, the eighth group of 64 nodes correspond to moving a square in the NE direction
+the next 8 planes (8 x 8 x 8 nodes) indicate a knight move, starting from the north north east move,
+and then rotating clockwise
+
 """
 
 def is_straight(distance_travel_x, distance_travel_y):
@@ -161,10 +164,14 @@ def method():
     start_x, start_y = text_to_position(string[0:2], is_black)
     end_x, end_y = text_to_position(string[2:4], is_black)
     distance_travel_x, distance_travel_y = abs(start_x - end_x) + abs(start_y - end_y)
-    if is_straight(distance_travel_x, distance_travel_y):
+    if is_straight(distance_travel_x, distance_travel_y): #if straight move
         squares_travel = distance_travel_x + distance_travel_y
     elif is_knight_move(distance_travel_x, distance_travel_y):
-        
+        squares_travel = 10 #indicates that it is a knight move
+    elif: #if pawn replacement
 
-    else: #diagonal move
+
+    else: #if diagonal move
+        squares_travel = distance_travel_x 
+
 
