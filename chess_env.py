@@ -83,6 +83,8 @@ def text_to_position(string, is_black):
     """
     returns position of the chesss piece
     from text coordinates eg: a1, h3, etc
+    under the perspective of the player 
+    whose turn is the current turn
     text manifests row numbers through numbers
     1 to 8, and manifests col numbers through
     letters a to h (lower cases)
@@ -99,6 +101,7 @@ def text_to_position(string, is_black):
     return (x, y)
 
 
+
 def array_to_text(array, is_black):
     """
     takes in numpy array action and translates it
@@ -111,33 +114,6 @@ def array_to_text(array, is_black):
         col_increment = -col_increment
 
 
-
-def play(board, NN, legal_moves_list, board_state_string):
-    """
-    takes in neural network and the list of legal moves from chess env
-    obtains numpy array of probability distribution of legal moves
-    takes a action from the numpy array, returns numpy array equivalent
-    of that action and text equivalent of that action for chess env
-    """
-    legal_moves_array = np.zeros([4672]) #initialize array of legal moves
-    is_black = not is_white(board_state_string)
-    move_text = array_to_text(move_array, is_black)
-    env_move = chess.Move.from_uci(move_text)
-    board.push(env_move)
-
-
-
-
-"""
-in our neural network, position is prioritized, then number of squares traversed,
-and then the direction of the traverse. if the order of: 64 nodes (8 by 8 chess grid),
-[1 to 7], and [N,NE,E,SE,S,SW,W,NW]
-ie, first 64 nodes all correspond to moving one square in the N direction. Then the next 64 correspond to
-moving two squares in N direction, the eighth group of 64 nodes correspond to moving a square in the NE direction
-the next 8 planes (8 x 8 x 8 nodes) indicate a knight move, starting from the north north east move,
-and then rotating clockwise
-
-"""
 
 def is_straight(distance_travel_x, distance_travel_y):
     """
@@ -161,24 +137,146 @@ def is_knight_move(distance_travel_x, distance_travel_y):
 
 
 
-def squares_traveled(move_string, is_black):
+def squaresANDdirections(displacement_x, displacement_y): 
     squares_travel = 0
-    start_x, start_y = text_to_position(move_string[0:2], is_black)
-    end_x, end_y = text_to_position(move_string[2:4], is_black)
-    distance_travel_x, distance_travel_y = abs(start_x - end_x) + abs(start_y - end_y)
-    if is_straight(distance_travel_x, distance_travel_y): #if straight move
-        squares_travel = distance_travel_x + distance_travel_y
-    elif is_knight_move(distance_travel_x, distance_travel_y):
-        squares_travel = 10 #indicates that it is a knight move
-    elif: #if pawn replacement
-
-
+    direction = 0 # index of the direction of the move in the list [N,NE,E,SE,S,SW,W,NW]
+    if is_straight(abs(displacement_x), abs(displacement_y)): #if straight move
+        squares_travel = abs(displacement_x) + abs(displacement_y)
+        if displacement_y > 0: #if N
+            direction = 0
+        elif displacement_x > 0: # f E
+            direction = 2
+        elif displacement_y < 0: #if S
+            direction = 4
+        else: #if W
+            direction = 6
     else: #if diagonal move
         squares_travel = distance_travel_x
-    return squares_travel
+        if displacement_y > 0 and displacement_x > 0: #if NE
+            direction = 1
+        elif displacement_y < 0 and displacement_x > 0: #if SE  
+            direction = 3
+        elif displacement_y < 0 and displacement_x < 0: #if SW  
+            direction = 5
+        else: #if NW
+            direction = 7
+    return squares_travel, direction
 
-def if_promotion(move_string):
+def if_under_promotion(move_string):
     return_value = False
-    if len(move_string) > 4 :
+    if len(move_string) > 4 and move_string[-1] != 'q':
         return_value = True
-    return True
+    return return_value
+
+def position_index(x, y):
+    """
+    uses x and y coordinates
+    to return position index (only position)
+    the index of the action node layer represents
+    position from left to right, top to bottom,
+    (like reading a book)
+    """
+    position_action_idx = 64* x + y
+    return position_action_idx
+    
+
+def legal_move_array_index(move_string, is_black)
+    start_x, start_y = text_to_position(move_string[0:2], is_black)
+    end_x, end_y = text_to_position(move_string[2:4], is_black)
+    displacement_x, displacement_y = (end_x- start_x), (start_y - end_y)
+    action_idx = 0 #initialize action index
+    position_idx = position_index(start_x, start_y)
+    if is_knight_move(abs(displacement_x), abs(displacement_y)):
+        if displacement_x > 0 and displacement_y > 0 :
+            if displacement_y > displacement_x: #if NNE
+                action_idx = position_idx + 8*8*56
+            else: #if NEE
+                action_idx = position_idx + 8*8*56 + 8*8
+        elif displacement_x > 0 and displacement_y < 0:
+            if abs(displacement_y) < displacement_x: #if SEE
+                action_idx = position_idx + 8*8*56 + 8*8*2
+            else: #if SSE
+                action_idx = position_idx + 8*8*56 + 8*8*3
+        elif displacement_x < 0 and displacement_y < 0:
+            if abs(displacement_y) > abs(displacement_x): #if SsW
+                action_idx = position_idx + 8*8*56 + 8*8*4
+            else: #if SWW
+                action_idx = position_idx + 8*8*56 + 8*8*5
+        elif displacement_x < 0 and displacement_y > 0:
+            if displacement_y > abs(displacement_x): #if NWW
+                action_idx = position_idx + 8*8*56 + 8*8*6
+            else: #if NNW
+                action_idx = position_idx + 8*8*56 + 8*8*7
+    elif if_under_promotion(move_string):
+        squares, direction = squaresANDdirections(displacement_x, displacement_y)
+        if direction == 0: #center move
+            if move_string[-1] == 'b': #if bishop
+                action_idx = position_idx + 8*8*(56+8)
+            if move_string[-1] == 'n': #if knight
+                action_idx = position_idx + 8*8*(56+8) + 8*8
+            else: #if rook
+                action_idx = position_idx + 8*8*(56+8) + 8*8*2
+        elif direction == 1: #right move
+            if move_string[-1] == 'b': #if bishop
+                action_idx = position_idx + 8*8*(56+8) + 8*8*3
+            if move_string[-1] == 'n': #if knight
+                action_idx = position_idx + 8*8*(56+8) + 8*8*4
+            else: #if rook
+                action_idx = position_idx + 8*8*(56+8) + 8*8*5
+        else: #left move
+            if move_string[-1] == 'b': #if bishop
+                action_idx = position_idx + 8*8*(56+8) + 8*8*6
+            if move_string[-1] == 'n': #if knight
+                action_idx = position_idx + 8*8*(56+8) + 8*8*7
+            else: #if rook
+                action_idx = position_idx + 8*8*(56+8) + 8*8*8
+    else: #normal queen move
+        squares, direction = squaresANDdirections(displacement_x, displacement_y)
+        action_idx = position_idx + (squares -1)*64 + direction*(64*8)
+    return action_idx
+
+
+"""
+in our neural network, position is prioritized, then number of squares traversed,
+and then the direction of the traverse. if the order of: 64 nodes (8 by 8 chess grid),
+[1 to 7], and [N,NE,E,SE,S,SW,W,NW]
+ie, first 64 nodes all correspond to moving one square in the N direction. Then the next 64 correspond to
+moving two squares in N direction, the eighth group of 64 nodes correspond to moving a square in the NE direction
+in all, the queen moves takes the first 8 x 8 x 56 moves
+the next 8 planes (8 x 8 x 8 nodes) indicate a knight move, starting from the north north east move,
+and then rotating clockwise
+the last nine planes indicates the nine different underpromotions. We order them such that
+pawn's direction move is prioritized, and then underpromotion piece is prioritized in 
+such order: bishop, knight and rook. Therefore, the order goes:
+center bishop, center knight, center rook, right bishop, right knight, right rook,
+left bishop, left knight and left rook.
+
+"""
+
+def play(board, NN, legal_moves_list):
+    """
+    takes in neural network and the list of legal moves from chess env
+    obtains numpy array of probability distribution of legal moves
+    takes a action from the numpy array, returns numpy array equivalent
+    of that action and text equivalent of that action for chess env
+    """
+    board_state_string = board.fen() # obtain state from board
+    state_array = input_state(board_state_string) # turn state into an array format for NN
+    legal_moves_array = np.zeros([4672]) # initialize array of legal moves
+    is_black = not is_white(board_state_string)
+    for move in legal_moves_list:
+        legal_move_array_idx = legal_move_array_index(move, is_black)
+        legal_moves_array[legal_move_array_idx] = 1
+    legal_moves_prob_distribution = (NN.forward(state_array) * legal_moves_array)  #we're assuming that NN forward runs the neural network
+    legal_moves_prob_distribution = legal_moves_prob_distribution / np.sum(legal_moves_prob_distribution) # normalize
+    action_idx = np.random.choice(4672, p = legal_moves_prob_distribution)
+    action_array = np.zeros([4672])
+    action_array[action_idx] = 1
+    move_text = array_to_text(action_array, is_black)
+    env_move = chess.Move.from_uci(move_text)
+    board.push(env_move)
+    return action_array
+
+
+
+
