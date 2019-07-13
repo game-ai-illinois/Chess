@@ -83,7 +83,7 @@ def text_to_position(string, is_black):
     """
     returns position of the chesss piece
     from text coordinates eg: a1, h3, etc
-    under the perspective of the player 
+    under the perspective of the player
     whose turn is the current turn
     text manifests row numbers through numbers
     1 to 8, and manifests col numbers through
@@ -92,12 +92,13 @@ def text_to_position(string, is_black):
     numerical coordinates that go from index
     zero to seven ie (0,7)
     """
-    #under perspective of black player, the position is flipped
-    y = int(string[1] - 1)
-    x = string[0] - ord('a')
-    if is_black:
+    print("string: ", string)
+    y = int(string[1]) - 1
+    x = ord(string[0]) - ord('a')
+    if is_black: #under perspective of black player, the position is flipped
         x = 7 - x
         y = 7 - y
+    print("x,y: ", (x, y))
     return (x, y)
 
 
@@ -137,7 +138,7 @@ def is_knight_move(distance_travel_x, distance_travel_y):
 
 
 
-def squaresANDdirections(displacement_x, displacement_y): 
+def squaresANDdirections(displacement_x, displacement_y):
     squares_travel = 0
     direction = 0 # index of the direction of the move in the list [N,NE,E,SE,S,SW,W,NW]
     if is_straight(abs(displacement_x), abs(displacement_y)): #if straight move
@@ -154,9 +155,9 @@ def squaresANDdirections(displacement_x, displacement_y):
         squares_travel = distance_travel_x
         if displacement_y > 0 and displacement_x > 0: #if NE
             direction = 1
-        elif displacement_y < 0 and displacement_x > 0: #if SE  
+        elif displacement_y < 0 and displacement_x > 0: #if SE
             direction = 3
-        elif displacement_y < 0 and displacement_x < 0: #if SW  
+        elif displacement_y < 0 and displacement_x < 0: #if SW
             direction = 5
         else: #if NW
             direction = 7
@@ -173,39 +174,50 @@ def position_index(x, y):
     uses x and y coordinates
     to return position index (only position)
     the index of the action node layer represents
-    position from left to right, top to bottom,
-    (like reading a book)
+    position from left to right, bottom to top,
+    (like reading a book, but from bottom of the page to top)
     """
-    position_action_idx = 64* x + y
+    position_action_idx = x + y*8
     return position_action_idx
-    
+
 
 def legal_move_array_index(move_string, is_black):
     start_x, start_y = text_to_position(move_string[0:2], is_black)
     end_x, end_y = text_to_position(move_string[2:4], is_black)
-    displacement_x, displacement_y = (end_x- start_x), (start_y - end_y)
+    displacement_x, displacement_y = (end_x- start_x), (end_y - start_y)
+    print("displacements: ",displacement_x," ", displacement_y )
     action_idx = 0 #initialize action index
     position_idx = position_index(start_x, start_y)
+    print("position_idx: ", position_idx)
     if is_knight_move(abs(displacement_x), abs(displacement_y)):
+        print("is Knight move")
         if displacement_x > 0 and displacement_y > 0 :
             if displacement_y > displacement_x: #if NNE
+                print("NNE")
                 action_idx = position_idx + 8*8*56
             else: #if NEE
+                print("NEE")
                 action_idx = position_idx + 8*8*56 + 8*8
         elif displacement_x > 0 and displacement_y < 0:
             if abs(displacement_y) < displacement_x: #if SEE
+                print("SEE")
                 action_idx = position_idx + 8*8*56 + 8*8*2
             else: #if SSE
+                print("SSE")
                 action_idx = position_idx + 8*8*56 + 8*8*3
         elif displacement_x < 0 and displacement_y < 0:
-            if abs(displacement_y) > abs(displacement_x): #if SsW
+            if abs(displacement_y) > abs(displacement_x): #if SSW
+                print("SSW")
                 action_idx = position_idx + 8*8*56 + 8*8*4
             else: #if SWW
+                print("SWW")
                 action_idx = position_idx + 8*8*56 + 8*8*5
         elif displacement_x < 0 and displacement_y > 0:
-            if displacement_y > abs(displacement_x): #if NWW
+            if displacement_y < abs(displacement_x): #if NWW
+                print("NWW")
                 action_idx = position_idx + 8*8*56 + 8*8*6
             else: #if NNW
+                print("NNW")
                 action_idx = position_idx + 8*8*56 + 8*8*7
     elif if_under_promotion(move_string):
         squares, direction = squaresANDdirections(displacement_x, displacement_y)
@@ -246,14 +258,14 @@ in all, the queen moves takes the first 8 x 8 x 56 moves
 the next 8 planes (8 x 8 x 8 nodes) indicate a knight move, starting from the north north east move,
 and then rotating clockwise
 the last nine planes indicates the nine different underpromotions. We order them such that
-pawn's direction move is prioritized, and then underpromotion piece is prioritized in 
+pawn's direction move is prioritized, and then underpromotion piece is prioritized in
 such order: bishop, knight and rook. Therefore, the order goes:
 center bishop, center knight, center rook, right bishop, right knight, right rook,
 left bishop, left knight and left rook.
 
 """
 
-def play(board, NN, legal_moves_list):
+def play(board, NN):
     """
     takes in neural network and the list of legal moves from chess env
     obtains numpy array of probability distribution of legal moves
@@ -264,8 +276,8 @@ def play(board, NN, legal_moves_list):
     state_array = input_state(board_state_string) # turn state into an array format for NN
     legal_moves_array = np.zeros([4672]) # initialize array of legal moves
     is_black = not is_white(board_state_string)
-    for move in legal_moves_list:
-        legal_move_array_idx = legal_move_array_index(move, is_black)
+    for move in board.legal_moves:
+        legal_move_array_idx = legal_move_array_index(move.uci(), is_black)
         legal_moves_array[legal_move_array_idx] = 1
     legal_moves_prob_distribution = (NN.forward(state_array) * legal_moves_array)  #we're assuming that NN forward runs the neural network
     legal_moves_prob_distribution = legal_moves_prob_distribution / np.sum(legal_moves_prob_distribution) # normalize
@@ -276,7 +288,3 @@ def play(board, NN, legal_moves_list):
     env_move = chess.Move.from_uci(move_text)
     board.push(env_move)
     return action_array
-
-
-
-
