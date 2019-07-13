@@ -66,7 +66,7 @@ def input_state(string):
             col += 1
     return input_state
 
-def is_white(string)
+def is_white(string):
     """
     takes in string variable of python-chess board.fen()
     and determins if the string is in the perspective of
@@ -180,7 +180,7 @@ def position_index(x, y):
     return position_action_idx
     
 
-def legal_move_array_index(move_string, is_black)
+def legal_move_array_index(move_string, is_black):
     start_x, start_y = text_to_position(move_string[0:2], is_black)
     end_x, end_y = text_to_position(move_string[2:4], is_black)
     displacement_x, displacement_y = (end_x- start_x), (start_y - end_y)
