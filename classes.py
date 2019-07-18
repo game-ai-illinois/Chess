@@ -105,53 +105,89 @@ class Node:
         next_move_child.prevNode_ = None #the child is now root node
         return next_move_child
 
-def res_block(input_size):
-    block= nn.Sequential(
-        nn.Conv2d(input_size,256, [3,3])# filters = output_size
-        nn.BatchNorm2d(),# batch normalization
-        nn.ReLU(),
-        nn.Conv2d(input_size, 256, [3,3])# filters = output_size
-        nn.BatchNorm2d(),# batch normalization
-        nn.ReLU(),
-    )
-    return nn.ReLU(input + block(input))
+class ResidualBlock(nn.Module):
+    def __init__(self, num_features):
+        super(ResidualBlock, self).__init__()
+        self.block = nn.Sequential(
+            ConvBlock(num_features, num_features)
+            nn.Conv2d(num_features, num_features, 3, stride=1, padding=1)# filters = output_size
+            nn.BatchNorm2d(num_features),# batch normalization
+        )
+        self.nonlinear_out = nn.ReLU()
 
-def conv_block(input_size):
-    return nn.Sequential(
-        nn.Conv2d(input_size,256, [3,3])# filters = output_size
-        nn.BatchNorm2d(),# batch normalization
-        nn.ReLU(),
-    )
+    def forward(self, x):
+        route = self.block(x)
+        skip = x + route
+        return self.nonlinear_out(skip)
+
+class ConvBlock(nn.Module):
+    def __init__(self, input_size, num_features):
+        super(ConvBlock, self).__init__()
+        self.module = nn.Sequential(
+            nn.Conv2d(input_size, num_features, 3, stride=1, padding=1)# filters = output_size
+            nn.BatchNorm2d(num_features),# batch normalization
+            nn.ReLU(),
+        )
+
+    def forward(self, x):
+        return self.module(x)
+
+class Flatten(nn.Module):
+
+    def forward(self, x):
+        return x.flatten(start_dim=1)
 
 class NN(nn.Module):
     """
     A Neural Network Class that plays the role of the neural network function
     in the paper "Mastering the game of Go without human knowledge"
     """
-    def __init__(self, input_size):
-        self.conv_block_ = conv_block(input_size)
-        self.res_block0_ = res_block(input_size)
-        self.res_block1_ = res_block(input_size)
-        self.res_block2_ = res_block(input_size)
-        self.res_block3_ = res_block(input_size)
-        self.res_block4_ = res_block(input_size)
-        self.res_block5_ = res_block(input_size)
-        self.res_block6_ = res_block(input_size)
-        self.res_block7_ = res_block(input_size)
-        self.res_block8_ = res_block(input_size)
+    def __init__(self, input_size, num_features, num_residual_layers, board_width, action_depth):
+
+        super(NN, self).__init__()
+        self.tower = nn.Sequential(
+            ConvBlock(input_size, num_features)
+        )
+
+        for i in range(num_residual_layers):
+            self.tower.add_module("resid"+str(i+1),
+                                    ResidualBlock(num_features))
+
+        self.policy_head = nn.Sequential(
+            nn.Conv2d(num_features, 2, kernel_size=1, stride=1),
+            nn.BatchNorm2d(2),
+            nn.ReLU(),
+            Flatten(),
+            nn.Linear(2 * (board_width ** 2), action_depth)
+        )
+
+        self.value_head = nn.Sequential(
+            nn.Conv2d(num_features, 1, kernel_size=1, stride=1),
+            nn.BatchNorm2d(1),
+            nn.ReLU(),
+            Flatten(),
+            nn.Linear(1 * (board_width ** 2), 256),
+            nn.ReLU(),
+            nn.Linear(256, 1),
+            nn.Tanh()
+        )
+
+        self.prob_mapper = nn.Softmax()
 
     def train(self, train_data):
         '''
         trains the network with given training data
         '''
-    def run(self. data):
+
+    def run(self, state, avail_actions):
         '''
         runs the network with data (analogous to "forward") to obtain
         policy (P), a vector quantity, and value (V), a scalar quantity
         '''
-        P = None
-        V = None
-        return P, V
+        tower = self.tower(state)
+        policy_logits = self.prob_mapper(avail_actions * self.policy_head(tower))
+        value = self.value_head(tower)
+        return policy_logits, value
 
     def getP(self, state):
         '''
