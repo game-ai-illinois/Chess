@@ -1,7 +1,6 @@
 import chess
 import numpy as np
 
-
 def layer_num(char):
     """
     helper funtion for input_state() method
@@ -279,8 +278,8 @@ def play(board, NN):
     for move in board.legal_moves:
         legal_move_array_idx = legal_move_array_index(move.uci(), is_black)
         legal_moves_array[legal_move_array_idx] = 1
-    legal_moves_prob_distribution = (NN.forward(state_array) * legal_moves_array)  #we're assuming that NN forward runs the neural network
-    legal_moves_prob_distribution = legal_moves_prob_distribution / np.sum(legal_moves_prob_distribution) # normalize
+    legal_moves_prob_distribution, _ = (NN.run(state_array) * legal_moves_array)  #we're assuming that NN forward runs the neural network
+    # legal_moves_prob_distribution = legal_moves_prob_distribution / np.sum(legal_moves_prob_distribution) # normalize
     action_idx = np.random.choice(4672, p = legal_moves_prob_distribution)
     action_array = np.zeros([4672])
     action_array[action_idx] = 1
@@ -288,3 +287,4 @@ def play(board, NN):
     env_move = chess.Move.from_uci(move_text)
     board.push(env_move)
     return action_array
+

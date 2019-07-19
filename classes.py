@@ -142,7 +142,7 @@ class NN(nn.Module):
     A Neural Network Class that plays the role of the neural network function
     in the paper "Mastering the game of Go without human knowledge"
     """
-    def __init__(self, input_size, num_features, num_residual_layers, board_width, action_depth):
+    def __init__(self, input_size, num_features, num_residual_layers, action_depth, board_width=8):
 
         super(NN, self).__init__()
         self.tower = nn.Sequential(
@@ -179,7 +179,7 @@ class NN(nn.Module):
         trains the network with given training data
         '''
 
-    def run(self, state, avail_actions):
+    def run(self, state, avail_actions = 4672):
         '''
         runs the network with data (analogous to "forward") to obtain
         policy (P), a vector quantity, and value (V), a scalar quantity
@@ -196,7 +196,7 @@ class NN(nn.Module):
         P, V = self.run(state)
         return P
 
-    def getV(self, state):
+    def getV(self, state, avail_actions):
         '''
         runs the network with data (analogous to "forward") to obtain the value (V) of the state for MCTS
         '''
