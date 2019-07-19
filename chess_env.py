@@ -1,5 +1,7 @@
 import chess
 import numpy as np
+import torch
+from classes import *
 
 def layer_num(char):
     """
@@ -91,13 +93,13 @@ def text_to_position(string, is_black):
     numerical coordinates that go from index
     zero to seven ie (0,7)
     """
-    print("string: ", string)
+    # print("string: ", string)
     y = int(string[1]) - 1
     x = ord(string[0]) - ord('a')
     if is_black: #under perspective of black player, the position is flipped
         x = 7 - x
         y = 7 - y
-    print("x,y: ", (x, y))
+    # print("x,y: ", (x, y))
     return (x, y)
 
 
@@ -184,39 +186,39 @@ def legal_move_array_index(move_string, is_black):
     start_x, start_y = text_to_position(move_string[0:2], is_black)
     end_x, end_y = text_to_position(move_string[2:4], is_black)
     displacement_x, displacement_y = (end_x- start_x), (end_y - start_y)
-    print("displacements: ",displacement_x," ", displacement_y )
+    # print("displacements: ",displacement_x," ", displacement_y )
     action_idx = 0 #initialize action index
     position_idx = position_index(start_x, start_y)
-    print("position_idx: ", position_idx)
+    # print("position_idx: ", position_idx)
     if is_knight_move(abs(displacement_x), abs(displacement_y)):
-        print("is Knight move")
+        # print("is Knight move")
         if displacement_x > 0 and displacement_y > 0 :
             if displacement_y > displacement_x: #if NNE
-                print("NNE")
+                # print("NNE")
                 action_idx = position_idx + 8*8*56
             else: #if NEE
-                print("NEE")
+                # print("NEE")
                 action_idx = position_idx + 8*8*56 + 8*8
         elif displacement_x > 0 and displacement_y < 0:
             if abs(displacement_y) < displacement_x: #if SEE
-                print("SEE")
+                # print("SEE")
                 action_idx = position_idx + 8*8*56 + 8*8*2
             else: #if SSE
-                print("SSE")
+                # print("SSE")
                 action_idx = position_idx + 8*8*56 + 8*8*3
         elif displacement_x < 0 and displacement_y < 0:
             if abs(displacement_y) > abs(displacement_x): #if SSW
-                print("SSW")
+                # print("SSW")
                 action_idx = position_idx + 8*8*56 + 8*8*4
             else: #if SWW
-                print("SWW")
+                # print("SWW")
                 action_idx = position_idx + 8*8*56 + 8*8*5
         elif displacement_x < 0 and displacement_y > 0:
             if displacement_y < abs(displacement_x): #if NWW
-                print("NWW")
+                # print("NWW")
                 action_idx = position_idx + 8*8*56 + 8*8*6
             else: #if NNW
-                print("NNW")
+                # print("NNW")
                 action_idx = position_idx + 8*8*56 + 8*8*7
     elif if_under_promotion(move_string):
         squares, direction = squaresANDdirections(displacement_x, displacement_y)
@@ -273,12 +275,15 @@ def play(board, NN):
     """
     board_state_string = board.fen() # obtain state from board
     state_array = input_state(board_state_string) # turn state into an array format for NN
+    state_array = state_array.reshape(1,*state_array.shape)
+    state_array = torch.from_numpy(state_array)
     legal_moves_array = np.zeros([4672]) # initialize array of legal moves
     is_black = not is_white(board_state_string)
     for move in board.legal_moves:
         legal_move_array_idx = legal_move_array_index(move.uci(), is_black)
         legal_moves_array[legal_move_array_idx] = 1
-    legal_moves_prob_distribution, _ = (NN.run(state_array) * legal_moves_array)  #we're assuming that NN forward runs the neural network
+    legal_moves_array = torch.from_numpy(legal_moves_array)
+    legal_moves_prob_distribution, _ = (NN.run(state_array, legal_moves_array))  #we're assuming that NN forward runs the neural network
     # legal_moves_prob_distribution = legal_moves_prob_distribution / np.sum(legal_moves_prob_distribution) # normalize
     action_idx = np.random.choice(4672, p = legal_moves_prob_distribution)
     action_array = np.zeros([4672])
@@ -287,4 +292,3 @@ def play(board, NN):
     env_move = chess.Move.from_uci(move_text)
     board.push(env_move)
     return action_array
-

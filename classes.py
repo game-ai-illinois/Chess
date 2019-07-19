@@ -3,14 +3,6 @@ import torch
 import torch.nn as nn
 
 #TO DO: add virtual loss variable in backup see pg.22
-class State:
-    """
-    A state class that represents the board state of chess
-    """
-    def __init__(self):
-
-
-
 
 class Node:
     """
@@ -109,8 +101,8 @@ class ResidualBlock(nn.Module):
     def __init__(self, num_features):
         super(ResidualBlock, self).__init__()
         self.block = nn.Sequential(
-            ConvBlock(num_features, num_features)
-            nn.Conv2d(num_features, num_features, 3, stride=1, padding=1)# filters = output_size
+            ConvBlock(num_features, num_features),
+            nn.Conv2d(num_features, num_features, 3, stride=1, padding=1),# filters = output_size
             nn.BatchNorm2d(num_features),# batch normalization
         )
         self.nonlinear_out = nn.ReLU()
@@ -124,7 +116,7 @@ class ConvBlock(nn.Module):
     def __init__(self, input_size, num_features):
         super(ConvBlock, self).__init__()
         self.module = nn.Sequential(
-            nn.Conv2d(input_size, num_features, 3, stride=1, padding=1)# filters = output_size
+            nn.Conv2d(input_size, num_features, 3, stride=1, padding=1),# filters = output_size
             nn.BatchNorm2d(num_features),# batch normalization
             nn.ReLU(),
         )
@@ -142,7 +134,7 @@ class NN(nn.Module):
     A Neural Network Class that plays the role of the neural network function
     in the paper "Mastering the game of Go without human knowledge"
     """
-    def __init__(self, input_size, num_features, num_residual_layers, action_depth, board_width=8):
+    def __init__(self, input_size, num_features, num_residual_layers, action_depth=4672, board_width=8):
 
         super(NN, self).__init__()
         self.tower = nn.Sequential(
@@ -179,7 +171,7 @@ class NN(nn.Module):
         trains the network with given training data
         '''
 
-    def run(self, state, avail_actions = 4672):
+    def run(self, state, avail_actions):
         '''
         runs the network with data (analogous to "forward") to obtain
         policy (P), a vector quantity, and value (V), a scalar quantity
@@ -189,7 +181,7 @@ class NN(nn.Module):
         value = self.value_head(tower)
         return policy_logits, value
 
-    def getP(self, state):
+    def getP(self, state, avail_actions):
         '''
         runs the network with data (analogous to "forward") to obtain prior probability (P) for MCTS
         '''
