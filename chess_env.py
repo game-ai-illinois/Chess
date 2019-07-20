@@ -103,18 +103,20 @@ def text_to_position(string, is_black):
     return (x, y)
 
 
-
-def array_to_text(array, is_black):
-    """
-    takes in numpy array action and translates it
-    into action understandable for chess env
-    """
-    row_increment = 0
-    col_increment = 0
-    if is_black: #this is because the command changes if the action is taken by black player
-        row_increment = -row_increment
-        col_increment = -col_increment
-
+"""
+not used function
+"""
+# def array_to_text(array, is_black):
+#     """
+#     takes in numpy array action and translates it
+#     into action understandable for chess env
+#     """
+#     row_increment = 0
+#     col_increment = 0
+#     if is_black: #this is because the command changes if the action is taken by black player
+#         row_increment = -row_increment
+#         col_increment = -col_increment
+#     return
 
 
 def is_straight(distance_travel_x, distance_travel_y):
@@ -182,7 +184,7 @@ def position_index(x, y):
     return position_action_idx
 
 
-def legal_move_array_index(move_string, is_black):
+def legal_move_array_index(move_string, is_black, move_dict):
     start_x, start_y = text_to_position(move_string[0:2], is_black)
     end_x, end_y = text_to_position(move_string[2:4], is_black)
     displacement_x, displacement_y = (end_x- start_x), (end_y - start_y)
@@ -246,6 +248,7 @@ def legal_move_array_index(move_string, is_black):
     else: #normal queen move
         squares, direction = squaresANDdirections(displacement_x, displacement_y)
         action_idx = position_idx + (squares -1)*64 + direction*(64*8)
+    move_dict[action_idx] = move_string
     return action_idx
 
 
@@ -276,19 +279,32 @@ def play(board, NN):
     board_state_string = board.fen() # obtain state from board
     state_array = input_state(board_state_string) # turn state into an array format for NN
     state_array = state_array.reshape(1,*state_array.shape)
-    state_array = torch.from_numpy(state_array)
+    state_array = torch.from_numpy(state_array).float()
     legal_moves_array = np.zeros([4672]) # initialize array of legal moves
     is_black = not is_white(board_state_string)
+    move_dict = {} #for translating back to move string
     for move in board.legal_moves:
-        legal_move_array_idx = legal_move_array_index(move.uci(), is_black)
+        legal_move_array_idx = legal_move_array_index(move.uci(), is_black, move_dict)
         legal_moves_array[legal_move_array_idx] = 1
-    legal_moves_array = torch.from_numpy(legal_moves_array)
+    print("move dict: ", move_dict)
+    print("legal_moves_array zero? ", (legal_moves_array == np.zeros([4672])).sum())
+    print(legal_moves_array[3590])
+    legal_moves_arrayCopy = legal_moves_array
+    legal_moves_array = legal_moves_array.reshape(1, *legal_moves_array.shape)
+    legal_moves_array = torch.from_numpy(legal_moves_array).float()
     legal_moves_prob_distribution, _ = (NN.run(state_array, legal_moves_array))  #we're assuming that NN forward runs the neural network
     # legal_moves_prob_distribution = legal_moves_prob_distribution / np.sum(legal_moves_prob_distribution) # normalize
-    action_idx = np.random.choice(4672, p = legal_moves_prob_distribution)
+    legal_moves_prob_distribution = legal_moves_prob_distribution.numpy().reshape(4672)
+    # legal_moves_prob_distribution = legal_moves_prob_distribution - np.min(legal_moves_prob_distribution)
+    # legal_moves_prob_distribution = legal_moves_prob_distribution /legal_moves_prob_distribution.sum()
+    # print("legal_moves_prob_distribution sum ",abs(legal_moves_prob_distribution).sum())
+    print("legal_moves_prob_distribution sum ",(legal_moves_prob_distribution* legal_moves_arrayCopy).sum())
+    print("legal_moves_prob_distribution sum ",(legal_moves_prob_distribution).sum())
+    action_idx = np.random.choice(4672, p = legal_moves_prob_distribution )
     action_array = np.zeros([4672])
     action_array[action_idx] = 1
-    move_text = array_to_text(action_array, is_black)
+    move_text = move_dict[action_idx]
+    print("move text: ", move_text)
     env_move = chess.Move.from_uci(move_text)
     board.push(env_move)
     return action_array

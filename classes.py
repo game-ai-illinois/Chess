@@ -177,7 +177,11 @@ class NN(nn.Module):
         policy (P), a vector quantity, and value (V), a scalar quantity
         '''
         tower = self.tower(state)
-        policy_logits = self.prob_mapper(avail_actions * self.policy_head(tower))
+        policy_logits = self.policy_head(tower)
+        policy_logits = (avail_actions * (policy_logits- torch.min(policy_logits)))
+        print("sum: ", torch.sum(policy_logits))
+        policy_logits = policy_logits/torch.sum(policy_logits)
+        policy_logits = torch.autograd.Variable(policy_logits, requires_grad=False)
         value = self.value_head(tower)
         return policy_logits, value
 
