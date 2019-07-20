@@ -155,7 +155,7 @@ def squaresANDdirections(displacement_x, displacement_y):
         else: #if W
             direction = 6
     else: #if diagonal move
-        squares_travel = distance_travel_x
+        squares_travel = abs(displacement_x)
         if displacement_y > 0 and displacement_x > 0: #if NE
             direction = 1
         elif displacement_y < 0 and displacement_x > 0: #if SE
@@ -282,6 +282,7 @@ def play(board, NN):
     state_array = torch.from_numpy(state_array).float()
     legal_moves_array = np.zeros([4672]) # initialize array of legal moves
     is_black = not is_white(board_state_string)
+    print("is black: ",is_black)
     move_dict = {} #for translating back to move string
     for move in board.legal_moves:
         legal_move_array_idx = legal_move_array_index(move.uci(), is_black, move_dict)
