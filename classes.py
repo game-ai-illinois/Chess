@@ -4,54 +4,83 @@ import torch.nn as nn
 
 #TO DO: add virtual loss variable in backup see pg.22
 
+class Edge:
+    """
+    an edge class
+    """
+    def __init__(self, parent_node, probability, move_text):
+        self.parent_node_ = parent_node #node that the edge belongs to
+        self.child_node_ = None #node that the edge connects to, first initialized to None
+        self.N_ = 0.0 # count
+        self.W_ = 0.0 # total action value
+        self.Q_ = 0.0 # action value
+        self.P_ = probability
+        self.move_text_ = move_text
+
+    def rollback(self, value):
+        self.N_ += 1
+        self.W_ += value
+        self.Q_ = self.W_ / self.N_
+        if self.parent_node_.parent_edge_ != None :
+            self.prevNode_.parent_edge_.rollback(value)
+
+
 class Node:
     """
     A Node class that represents a node in a MCTS as stated in the paper
     "Mastering the game of Go without human knowledge"
     """
-    def __init__(self, state, NN):
+    def __init__(self, board, parent_edge = None):
         '''
         We use the state and Neural Network to obtain prior probability (P_)
         and evaluation of value of the node (V_)
         '''
-        self.state_ = state # state of the chess env
-        self.N_ = 0.0 # count
-        self.W_ = 0.0 # total action value
-        self.Q_ = 0.0 # action value
-        self.prevNode_ = None # None value idicates that it is root node
-        self.children_ = [] # list of children nodes
+        self.board_ = board # state of the chess env
+        self.parent_edge_ = parent_edge # None value idicates that the node is root
+        self.children_edges_ = [] # list of edges nodes
 
-        self.P_ = NN.getP(state)
-
-    def getChildren(self, env):
+    def getChildrenEdges(self, NN):
         '''
         obtains all the children nodes from interacting with the chess env
         '''
-        possible_child_nodes =[]
-
-        self.children_ = possible_child_nodes
+        board_state_string = self.board_.fen()
+        state_array = input_state(board_state_string) #turn into arrays for NN
+        is_black = not is_white(board_state_string)
+        legal_moves_array, move_dict = return_legal_moves(board, is_black)
+        P , _ = NN.run(state_array, legal_moves_array)
+        for idx in range(len(legal_moves_array)):
+            if legal_moves_array[idx] != 0:
+                edge = Edge(node, p[idx], move_dict[idx])
+                self.children_edges_.append(edge)
 
     def select(self, c_puct):
         '''
+        returns indx of a child edge to select to play
         Clarification: this function does not pick a move to play
         from the given parameters pick a child node to traverse to
         the P_ (prior probability) is obtained from running the Neural Network
         when the node was initialized. We assume P is a np array
         '''
-        Q = []# initialize to obtain Q values
-        N_child = [] # initialize to obtain N of each child
-        if self.children_ == None:
+        if node.P_:
+            print("node's probability not defined and is None")
+            return None #end function
+        if self.children_edges_ == []:
             print("children nodes not initialized")
             return None
-        for child in self.children_ :
-            Q.append(child.Q_)
-            N_child.append(child.N_)
+        Q = []# initialize to obtain Q values
+        N_child = [] # initialize to obtain N of each child
+        P = []
+        for edge in self.children_edges_ :
+            Q.append(edge.Q_)
+            N_child.append(edge.N_)
+            P.append(edge.P_)
         Q = np.array(Q)
         N_child = np.array(N_child)
-        N_all = self.N_ # we assume N of all children == N of parent
-        U = c_puct* self.P_* np.sqrt(N_all)/ (1 + N_child) #obtain the U values
-        selected_child = np.argmax(Q+U)
-        return selected_child
+        p = np.array(P)
+        N_all = np.sum(N_child)
+        U = c_puct* P* np.sqrt(N_all)/ (1 + N_child) #obtain the U values
+        selected_child_idx = np.argmax(Q+U)
+        return selected_child_idx
 
     def backTrack(self, value):
         '''
@@ -85,14 +114,14 @@ class Node:
         Makes a move and picks the next node (state) to go to
         '''
         N_vector = [] # vector of N^(1/temp) values of all children
-        for child in self.children_:
+        for child in self.children_edges_:
             N_vector.append(child.N_**(1/temp))
         N_vector = np.array([N_vector]) # make it np array
         N_vector = N_vector/np.sum(N_vector) # normalize to make it a probability distribution
         next_move_idx = np.random.choice([i in range(N_vector.shape[0])], p = N_vector)
         # next_move_arg picks the index of the N_vector according to its probability distribution
-        next_move_child = self.children_[next_move_idx] # picks the next child
-        self.children_ = None # frees not picked children to be deleted \
+        next_move_child = self.children_edges_[next_move_idx] # picks the next child
+        self.children_edges_ = None # frees not picked children to be deleted \
         # still not sure if this is a valid way to free up memory however
         next_move_child.prevNode_ = None #the child is now root node
         return next_move_child
@@ -175,7 +204,10 @@ class NN(nn.Module):
         '''
         runs the network with data (analogous to "forward") to obtain
         policy (P), a vector quantity, and value (V), a scalar quantity
+        both the state and avail_actions are assumed to be np arrays
         '''
+        state = torch.from_numpy(state).float() #turn state and avail_actions into torch tensors
+        avail_actions = torch.from_numpy(avail_actions).float()
         tower = self.tower(state)
         policy_logits = self.policy_head(tower)
         policy_logits = (avail_actions * (policy_logits- torch.min(policy_logits)))

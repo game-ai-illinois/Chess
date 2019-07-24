@@ -50,7 +50,7 @@ def input_state(string):
     then opponent's pieces. The order goes as:
     pawn, rook, bishop, knight, queen, king.
     """
-    input_state = np.zeros([12, 8, 8])
+    input_state = np.zeros([1,12, 8, 8]) #the extra dim is there bc torch requires an additional dim for batch run
     row = 0
     col = 0
     for char in string:
@@ -63,7 +63,7 @@ def input_state(string):
             col += int(char)
         else:
             piece_idx = layer_num(char)
-            input_state[piece_idx, (7 - row), col] = 1
+            input_state[0, piece_idx, (7 - row), col] = 1
             col += 1
     return input_state
 
@@ -269,7 +269,16 @@ left bishop, left knight and left rook.
 
 """
 
-def play(board, NN):
+def return_legal_moves(board, is_black):
+    legal_moves_array = np.zeros([4672]) # initialize array of legal moves
+    move_dict = {} #for translating back to move string
+    for move in board.legal_moves:
+        legal_move_array_idx = legal_move_array_index(move.uci(), is_black, move_dict)
+        legal_moves_array[legal_move_array_idx] = 1
+    legal_moves_array = legal_moves_array.reshape(1, *legal_moves_array.shape)
+    return legal_moves_array, move_dict
+
+def random_play(board, NN):
     """
     takes in neural network and the list of legal moves from chess env
     obtains numpy array of probability distribution of legal moves
@@ -278,28 +287,17 @@ def play(board, NN):
     """
     board_state_string = board.fen() # obtain state from board
     state_array = input_state(board_state_string) # turn state into an array format for NN
-    state_array = state_array.reshape(1,*state_array.shape)
-    state_array = torch.from_numpy(state_array).float()
-    legal_moves_array = np.zeros([4672]) # initialize array of legal moves
     is_black = not is_white(board_state_string)
     print("is black: ",is_black)
-    move_dict = {} #for translating back to move string
-    for move in board.legal_moves:
-        legal_move_array_idx = legal_move_array_index(move.uci(), is_black, move_dict)
-        legal_moves_array[legal_move_array_idx] = 1
-    print("move dict: ", move_dict)
-    print("legal_moves_array zero? ", (legal_moves_array == np.zeros([4672])).sum())
-    print(legal_moves_array[3590])
-    legal_moves_arrayCopy = legal_moves_array
-    legal_moves_array = legal_moves_array.reshape(1, *legal_moves_array.shape)
-    legal_moves_array = torch.from_numpy(legal_moves_array).float()
+    legal_moves_array = np.zeros([4672]) # initialize array of legal moves
+    legal_moves_array, move_dict = return_legal_moves(board, is_black)
     legal_moves_prob_distribution, _ = (NN.run(state_array, legal_moves_array))  #we're assuming that NN forward runs the neural network
     # legal_moves_prob_distribution = legal_moves_prob_distribution / np.sum(legal_moves_prob_distribution) # normalize
     legal_moves_prob_distribution = legal_moves_prob_distribution.numpy().reshape(4672)
     # legal_moves_prob_distribution = legal_moves_prob_distribution - np.min(legal_moves_prob_distribution)
     # legal_moves_prob_distribution = legal_moves_prob_distribution /legal_moves_prob_distribution.sum()
     # print("legal_moves_prob_distribution sum ",abs(legal_moves_prob_distribution).sum())
-    print("legal_moves_prob_distribution sum ",(legal_moves_prob_distribution* legal_moves_arrayCopy).sum())
+    # print("legal_moves_prob_distribution sum ",(legal_moves_prob_distribution* legal_moves_arrayCopy).sum())
     print("legal_moves_prob_distribution sum ",(legal_moves_prob_distribution).sum())
     action_idx = np.random.choice(4672, p = legal_moves_prob_distribution )
     action_array = np.zeros([4672])
