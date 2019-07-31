@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
+from chess_env import input_state, is_white, return_legal_moves
 
 #TO DO: add virtual loss variable in backup see pg.22
 
@@ -8,16 +9,31 @@ class Edge:
     """
     an edge class
     """
-    def __init__(self, parent_node, probability, move_text):
+    def __init__(self, parent_node, probability, move_idx, move_text):
         self.parent_node_ = parent_node #node that the edge belongs to
         self.child_node_ = None #node that the edge connects to, first initialized to None
         self.N_ = 0.0 # count
         self.W_ = 0.0 # total action value
         self.Q_ = 0.0 # action value
         self.P_ = probability
+        self.move_idx_ = move_idx
         self.move_text_ = move_text
 
+    def __del__(self): 
+        del self.child_node_ 
+        del self.N_
+        del self.W_
+        del self.Q_
+        del self.P_
+        del self.move_text_ 
+        del self.parent_node_
+        print("destruct edge")
+        # I wonder if I have to desctuct "self" as well
+
     def rollback(self, value):
+        '''
+        recursive backtracking method for MCTS
+        '''
         self.N_ += 1
         self.W_ += value
         self.Q_ = self.W_ / self.N_
@@ -36,21 +52,48 @@ class Node:
         and evaluation of value of the node (V_)
         '''
         self.board_ = board # state of the chess env
-        self.parent_edge_ = parent_edge # None value idicates that the node is root
+        self.parent_edge_ = parent_edge # None value idicates that the node is starting game node
+        #root nodes should otherwise still have parent edges to access its value for stop condition
         self.children_edges_ = [] # list of edges nodes
+        board_state_string = self.board_.fen()
+        self.state_ = input_state(board_state_string)
+        self.is_black_ = not is_white(board_state_string)
 
-    def getChildrenEdges(self, NN):
+    def __del__(self, keep_child_idx = None):
+         
+        """
+        Delete function for Node class
+        """
+        del self.board_
+        if keep_child_idx != None : # delete all edges except the one specified by keep_child_idx
+            for edge_idx in range(len(self.children_edges_)):
+                if edge_idx != keep_child_idx:
+                    del self.children_edges_[0]
+                else:
+                    l.pop(0) #pop the desired edge out
+        else:
+            for edge in self.children_edges_:
+                del edge
+        del self.children_edges_ 
+        self.board_ = None
+        del self.parent_edge_
+        print("destruct node")
+
+    def getChildrenEdges(self, NN): 
         '''
         obtains all the children nodes from interacting with the chess env
         '''
         board_state_string = self.board_.fen()
         state_array = input_state(board_state_string) #turn into arrays for NN
         is_black = not is_white(board_state_string)
-        legal_moves_array, move_dict = return_legal_moves(board, is_black)
-        P , _ = NN.run(state_array, legal_moves_array)
+        legal_moves_array, move_dict = return_legal_moves(self.board_, is_black)
+        print("state array shape: ", state_array.shape)
+        print("legal array shape: ", legal_moves_array.shape)
+        prin(legal_moves_array)
+        P, _ = (NN.run(state_array, legal_moves_array))
         for idx in range(len(legal_moves_array)):
             if legal_moves_array[idx] != 0:
-                edge = Edge(node, p[idx], move_dict[idx])
+                edge = Edge(node, p[idx], idx, move_dict[idx])
                 self.children_edges_.append(edge)
 
     def select(self, c_puct):
@@ -81,50 +124,6 @@ class Node:
         U = c_puct* P* np.sqrt(N_all)/ (1 + N_child) #obtain the U values
         selected_child_idx = np.argmax(Q+U)
         return selected_child_idx
-
-    def backTrack(self, value):
-        '''
-        recursive backtracking method for MCTS
-        '''
-        self.N_ += 1
-        self.W_ += value
-        self.Q_ = self.W_ /self.N_
-        if self.prevNode_ != None:
-            self.prevNode_.backTrack(value)
-
-    def runSimulation(self, state, NN, remain_iter):
-        '''
-        runs MCTS simulation once
-        remain_iter argument gives remaining number of simulations iterations
-        that we still need to do. The number is decremented by one everytime
-        a simulation goes to the next child node
-        '''
-        if remainIter == 0: #last node. This means we have to decide the winner
-            v = NN.getV(state)
-            self.backTrack(v) #start back tracking
-        else:
-            next_node = self.select()
-            next_node.prevNode_ = self # link selected child to parent
-            next_remain_iter = remain_iter - 1
-            next_node.runSimulation(next_remain_iter)
-
-
-    def pickMove(self, temp):
-        '''
-        Makes a move and picks the next node (state) to go to
-        '''
-        N_vector = [] # vector of N^(1/temp) values of all children
-        for child in self.children_edges_:
-            N_vector.append(child.N_**(1/temp))
-        N_vector = np.array([N_vector]) # make it np array
-        N_vector = N_vector/np.sum(N_vector) # normalize to make it a probability distribution
-        next_move_idx = np.random.choice([i in range(N_vector.shape[0])], p = N_vector)
-        # next_move_arg picks the index of the N_vector according to its probability distribution
-        next_move_child = self.children_edges_[next_move_idx] # picks the next child
-        self.children_edges_ = None # frees not picked children to be deleted \
-        # still not sure if this is a valid way to free up memory however
-        next_move_child.prevNode_ = None #the child is now root node
-        return next_move_child
 
 class ResidualBlock(nn.Module):
     def __init__(self, num_features):
@@ -195,10 +194,8 @@ class NN(nn.Module):
 
         self.prob_mapper = nn.Softmax()
 
-    def train(self, train_data):
-        '''
-        trains the network with given training data
-        '''
+    # def train(self, train_data):
+        
 
     def run(self, state, avail_actions):
         '''
@@ -230,3 +227,23 @@ class NN(nn.Module):
         '''
         P, V = self.run(state)
         return V
+
+
+    def optimizer(self, learning_rate, c):
+        return torch.optim.Adam({self.tower.parameters(), self.policy_head.parameters(), self.value_head.parameters()}, lr=learning_rate, weight_decay= c)
+
+    def optimization(self, data, learning_rate, c):
+        '''
+        trains the network with given training data
+        '''
+        state = data[0]
+        search_policy = data[1]
+        z = data[-1]
+        avail_actions = search_policy != 0
+        P, V = self.run(state, avail_actions)
+        loss = torch.mm((z-V), (z-V)) - torch.mm(search_policy, torch.log(P))
+        print("Loss: ", loss)
+        optimizer = self.optimizer(learning_rate)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()

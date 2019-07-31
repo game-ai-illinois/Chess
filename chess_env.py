@@ -1,7 +1,7 @@
 import chess
 import numpy as np
 import torch
-from classes import *
+
 
 def layer_num(char):
     """
@@ -291,6 +291,8 @@ def random_play(board, NN):
     print("is black: ",is_black)
     legal_moves_array = np.zeros([4672]) # initialize array of legal moves
     legal_moves_array, move_dict = return_legal_moves(board, is_black)
+    print("state array shape: ", state_array.shape)
+    print("legal array sahpe: ", legal_moves_array.shape)
     legal_moves_prob_distribution, _ = (NN.run(state_array, legal_moves_array))  #we're assuming that NN forward runs the neural network
     # legal_moves_prob_distribution = legal_moves_prob_distribution / np.sum(legal_moves_prob_distribution) # normalize
     legal_moves_prob_distribution = legal_moves_prob_distribution.numpy().reshape(4672)
