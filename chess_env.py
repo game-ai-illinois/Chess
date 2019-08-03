@@ -302,6 +302,7 @@ def random_play(board, NN):
     # print("legal_moves_prob_distribution sum ",(legal_moves_prob_distribution* legal_moves_arrayCopy).sum())
     print("legal_moves_prob_distribution sum ",(legal_moves_prob_distribution).sum())
     action_idx = np.random.choice(4672, p = legal_moves_prob_distribution )
+    print("action idx: ", action_idx)
     action_array = np.zeros([4672])
     action_array[action_idx] = 1
     move_text = move_dict[action_idx]
@@ -309,3 +310,12 @@ def random_play(board, NN):
     env_move = chess.Move.from_uci(move_text)
     board.push(env_move)
     return action_array
+
+
+def done_game(board):
+    if  board.is_insufficient_material() or board.is_variant_draw() :
+        return "draw"
+    elif board.is_variant_win() :
+        return "won"
+    else:
+        return False
