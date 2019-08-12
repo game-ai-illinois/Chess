@@ -122,7 +122,7 @@ class Edge:
         del self.P_
         del self.move_text_ 
         del self.parent_node_
-        print("destruct edge")
+        # print("destruct edge")
         # I wonder if I have to desctuct "self" as well
 
     def rollback(self, value):
@@ -182,16 +182,21 @@ class Node:
         state_array = input_state(board_state_string) #turn into arrays for NN
         is_black = not is_white(board_state_string)
         legal_moves_array, move_dict = return_legal_moves(self.board_, is_black)
-        print("state array shape: ", state_array.shape)
-        print("legal array shape: ", legal_moves_array.shape)
-        print(type(legal_moves_array))
+        # print("state array shape: ", state_array.shape)
+        # print("legal array shape: ", legal_moves_array.shape)
+        # print(type(legal_moves_array))
         P, _ = (NN.run(state_array, legal_moves_array)) # P.shape is (1, 4672)
-        print("P shape: ", P.shape)
-        for idx in range(4672):
-            if legal_moves_array[0, idx] != 0: # as the legal_moves_array.shape is (1, 4672)
+        # print("P shape: ", P.shape)
+        for idx in range(4672): #as the legal_moves_array.shape is (1, 4672)
+            if legal_moves_array[0, idx] != 0: 
+                # print("legal move recognized")
                 edge = Edge(self, P[0, idx], idx, move_dict[idx])
                 # print("ege: ", edge)
                 self.children_edges_.append(edge)
+        print("child edges size: ", len(self.children_edges_))
+        if len(self.children_edges_) == 0 :
+            print("child edge length zero")
+        print("child edges appended")
         # print(self.children_edges_)
 
     def select(self, c_puct):

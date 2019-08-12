@@ -272,10 +272,23 @@ left bishop, left knight and left rook.
 def return_legal_moves(board, is_black):
     legal_moves_array = np.zeros([4672]) # initialize array of legal moves
     move_dict = {} #for translating back to move string
+    flag = 0
     for move in board.legal_moves:
+        flag += 1
         legal_move_array_idx = legal_move_array_index(move.uci(), is_black, move_dict)
         legal_moves_array[legal_move_array_idx] = 1
     legal_moves_array = legal_moves_array.reshape(1, *legal_moves_array.shape)
+    if flag > 0 :
+        print("moves exist")
+        # print("board: ", board)
+        # print(board.legal_moves)
+        # print([move for move in board.legal_moves])
+    else:
+        print("moves don't exist")
+        # print("board: ", board)
+        # print("done game: " , done_game(board))
+        # print(board.legal_moves)
+        # print([move for move in board.legal_moves])
     return legal_moves_array, move_dict
 
 def random_play(board, NN):
@@ -291,8 +304,8 @@ def random_play(board, NN):
     print("is black: ",is_black)
     legal_moves_array = np.zeros([4672]) # initialize array of legal moves
     legal_moves_array, move_dict = return_legal_moves(board, is_black)
-    print("state array shape: ", state_array.shape)
-    print("legal array sahpe: ", legal_moves_array.shape)
+    # print("state array shape: ", state_array.shape)
+    # print("legal array sahpe: ", legal_moves_array.shape)
     legal_moves_prob_distribution, _ = (NN.run(state_array, legal_moves_array))  #we're assuming that NN forward runs the neural network
     # legal_moves_prob_distribution = legal_moves_prob_distribution / np.sum(legal_moves_prob_distribution) # normalize
     legal_moves_prob_distribution = legal_moves_prob_distribution.numpy().reshape(4672)
@@ -300,7 +313,7 @@ def random_play(board, NN):
     # legal_moves_prob_distribution = legal_moves_prob_distribution /legal_moves_prob_distribution.sum()
     # print("legal_moves_prob_distribution sum ",abs(legal_moves_prob_distribution).sum())
     # print("legal_moves_prob_distribution sum ",(legal_moves_prob_distribution* legal_moves_arrayCopy).sum())
-    print("legal_moves_prob_distribution sum ",(legal_moves_prob_distribution).sum())
+    # print("legal_moves_prob_distribution sum ",(legal_moves_prob_distribution).sum())
     action_idx = np.random.choice(4672, p = legal_moves_prob_distribution )
     print("action idx: ", action_idx)
     action_array = np.zeros([4672])
@@ -313,9 +326,19 @@ def random_play(board, NN):
 
 
 def done_game(board):
-    if  board.is_insufficient_material() or board.is_variant_draw() :
-        return "draw"
-    elif board.is_variant_win() :
-        return "won"
+    if board.is_game_over():
+        print("board result: ",board.result())
+        return board.result()
     else:
         return False
+    # if  board.is_insufficient_material() or board.is_variant_draw() :
+    #     return "draw"
+    # elif board.is_variant_win():
+    #     return "win"
+    # elif board.is_variant_loss():
+    #     return "loss"
+    # elif board.is_game_over():
+    #     print("anomaly")
+    #     return False
+    # else:
+    #     return False
