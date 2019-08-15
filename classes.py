@@ -85,7 +85,7 @@ class NN(nn.Module):
     # def optimizer(self, learning_rate, C):
     #     return torch.optim.Adam({self.tower.parameters(), self.policy_head.parameters(), self.value_head.parameters()}, lr=learning_rate, weight_decay= C)
 
-    def optimization(self, archive, learning_rate, C):
+    def optimization(self, archive):
         '''
         trains the network with given training data
         '''
