@@ -79,21 +79,26 @@ class NN(nn.Module):
         return V
 
 
-    def optimizer(self, learning_rate, c):
-        return torch.optim.Adam({self.tower.parameters(), self.policy_head.parameters(), self.value_head.parameters()}, lr=learning_rate, weight_decay= c)
+    def optimizer(self, learning_rate, C):
+        return torch.optim.Adam({self.tower.parameters(), self.policy_head.parameters(), self.value_head.parameters()}, lr=learning_rate, weight_decay= C)
 
-    def optimization(self, data, learning_rate, c):
+    def optimization(self, archive, learning_rate, C):
         '''
         trains the network with given training data
         '''
-        state = data[0]
-        search_policy = data[1]
-        z = data[-1]
+        state = np.empty((1, 12, 8, 8))
+        search_policy =  np.empty((1, 4672))
+        z = []
+        for data in archive:
+            np.vstack((state, data[0]))
+            np.vstack((search_policy, data[1]))
+            z.append(data[-1])
+        z = torch.FloatTensor(z)  #turn list into torch tensor
         avail_actions = search_policy != 0
         P, V = self.run(state, avail_actions)
-        loss = torch.mm((z-V), (z-V)) - torch.mm(search_policy, torch.log(P))
+        loss = torch.mm((z-V), (z-V).t()) - torch.mm(torch.from_numpy(search_policy).float(), torch.log(P).t())
         print("Loss: ", loss)
-        optimizer = self.optimizer(learning_rate)
+        optimizer = self.optimizer(learning_rate, C)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()

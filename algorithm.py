@@ -159,9 +159,8 @@ def test(v_resign = None, newgame= True):
     postProcess(archive, winner_is_white)
     return archive
 
-# def train(archive):
-
-    
+def train(NN, archive, learning_rate, C):
+    NN.optimization(archive, learning_rate, C)
 
 def postProcess(archive, winner_is_white):
 
