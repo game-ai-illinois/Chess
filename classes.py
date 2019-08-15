@@ -3,6 +3,8 @@ import torch
 import torch.nn as nn
 from chess_env import input_state, is_white, return_legal_moves
 import chess
+import random
+import math
 
 #TO DO: add virtual loss variable in backup see pg.22
 
@@ -12,9 +14,20 @@ class NN(nn.Module):
     A Neural Network Class that plays the role of the neural network function
     in the paper "Mastering the game of Go without human knowledge"
     """
-    def __init__(self, input_size, num_features, num_residual_layers, action_depth=4672, board_width=8, learning_rate = 0.001, C = 0.001):
+    def __init__(self,
+                    input_size,
+                    num_features,
+                    num_residual_layers,
+                    action_depth=4672,
+                    board_width=8,
+                    learning_rate = 0.001,
+                    C = 0.001,
+                    batch_size=32):
 
         super(NN, self).__init__()
+
+        self.batch_size = batch_size
+
         self.tower = nn.Sequential(
             ConvBlock(input_size, num_features)
         )
@@ -48,7 +61,7 @@ class NN(nn.Module):
         self.optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate, weight_decay= C)
 
     # def train(self, train_data):
-        
+
 
     def run(self, state, avail_actions):
         '''
@@ -89,6 +102,7 @@ class NN(nn.Module):
         '''
         trains the network with given training data
         '''
+        """
         state = np.empty((1, 12, 8, 8))
         search_policy =  np.empty((1, 4672))
         z = []
@@ -110,6 +124,38 @@ class NN(nn.Module):
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
+        """
+
+        state = []
+        search_policy =  []
+        z = []
+        for data in archive:
+            state.append(data[0])
+            search_policy.append(data[1])
+            z.append(data[-1])
+        state = np.vstack(state)
+        search_policy = np.vstack(search_policy)
+        z = torch.FloatTensor(z)  #turn list into torch tensor
+        avail_actions = search_policy != 0
+        indices = list(range(len(archive)))
+        random.shuffle(indices)
+        count = 0
+        for i in range(math.ceil(len(archive) / self.batch_size)):
+            curr_batch_size = min(self.batch_size, len(archive) - count)
+            upper = count + curr_batch_size
+            curr_indices = indices[count:upper]
+            batch_state, batch_search_policy, batch_actions = state[curr_indices], search_policy[curr_indices], avail_actions[curr_indices]
+            batch_z = z[curr_indices]
+            P, V = self.run(batch_state, batch_actions)
+            P[P == 0] = 1 # assign zero values to one so the log with make it zero
+            loss = torch.mm((batch_z-V), (batch_z-V).t()) - torch.mm(torch.from_numpy(batch_search_policy).float(), torch.log(P).t())
+            loss = torch.mean(loss)
+            print("Loss: ", loss)
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+            count += curr_batch_size
+
 
 
 class Edge:
@@ -127,13 +173,13 @@ class Edge:
         self.move_idx_ = move_idx
         self.move_text_ = move_text
 
-    def __del__(self): 
-        del self.child_node_ 
+    def __del__(self):
+        del self.child_node_
         del self.N_
         del self.W_
         del self.Q_
         del self.P_
-        del self.move_text_ 
+        del self.move_text_
         del self.parent_node_
         # print("destruct edge")
         # I wonder if I have to desctuct "self" as well
@@ -168,7 +214,7 @@ class Node:
         self.is_black_ = not is_white(board_state_string)
 
     def __del__(self, keep_child_idx = None):
-         
+
         """
         Delete function for Node class
         """
@@ -182,12 +228,12 @@ class Node:
         else:
             for edge in self.children_edges_:
                 del edge
-        del self.children_edges_ 
+        del self.children_edges_
         self.board_ = None
         del self.parent_edge_
         # print("destruct node")
 
-    def getChildrenEdges(self, NN): 
+    def getChildrenEdges(self, NN):
         '''
         obtains all the children nodes from interacting with the chess env
         '''
@@ -201,7 +247,7 @@ class Node:
         P, _ = (NN.run(state_array, legal_moves_array)) # P.shape is (1, 4672)
         # print("P shape: ", P.shape)
         for idx in range(4672): #as the legal_moves_array.shape is (1, 4672)
-            if legal_moves_array[0, idx] != 0: 
+            if legal_moves_array[0, idx] != 0:
                 # print("legal move recognized")
                 edge = Edge(self, P[0, idx], idx, move_dict[idx])
                 # print("ege: ", edge)
