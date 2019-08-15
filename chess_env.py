@@ -272,23 +272,23 @@ left bishop, left knight and left rook.
 def return_legal_moves(board, is_black):
     legal_moves_array = np.zeros([4672]) # initialize array of legal moves
     move_dict = {} #for translating back to move string
-    flag = 0
+    # flag = 0
     for move in board.legal_moves:
-        flag += 1
+        # flag += 1
         legal_move_array_idx = legal_move_array_index(move.uci(), is_black, move_dict)
         legal_moves_array[legal_move_array_idx] = 1
     legal_moves_array = legal_moves_array.reshape(1, *legal_moves_array.shape)
-    if flag > 0 :
-        print("moves exist")
-        # print("board: ", board)
-        # print(board.legal_moves)
-        # print([move for move in board.legal_moves])
-    else:
-        print("moves don't exist")
-        # print("board: ", board)
-        # print("done game: " , done_game(board))
-        # print(board.legal_moves)
-        # print([move for move in board.legal_moves])
+    # if flag > 0 :
+    #     # print("moves exist")
+    #     # print("board: ", board)
+    #     # print(board.legal_moves)
+    #     # print([move for move in board.legal_moves])
+    # else:
+    #     # print("moves don't exist")
+    #     # print("board: ", board)
+    #     # print("done game: " , done_game(board))
+    #     # print(board.legal_moves)
+    #     # print([move for move in board.legal_moves])
     return legal_moves_array, move_dict
 
 def random_play(board, NN):

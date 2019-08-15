@@ -12,7 +12,7 @@ class NN(nn.Module):
     A Neural Network Class that plays the role of the neural network function
     in the paper "Mastering the game of Go without human knowledge"
     """
-    def __init__(self, input_size, num_features, num_residual_layers, action_depth=4672, board_width=8):
+    def __init__(self, input_size, num_features, num_residual_layers, action_depth=4672, board_width=8, learning_rate = 0.001, C = 0.001):
 
         super(NN, self).__init__()
         self.tower = nn.Sequential(
@@ -61,7 +61,7 @@ class NN(nn.Module):
         tower = self.tower(state)
         policy_logits = self.policy_head(tower)
         policy_logits = (avail_actions * (policy_logits- torch.min(policy_logits)))
-        print("sum: ", torch.sum(policy_logits))
+        # print("sum: ", torch.sum(policy_logits))
         policy_logits = policy_logits/torch.sum(policy_logits)
         policy_logits = torch.autograd.Variable(policy_logits, requires_grad=False)
         value = self.value_head(tower)
@@ -99,7 +99,12 @@ class NN(nn.Module):
         z = torch.FloatTensor(z)  #turn list into torch tensor
         avail_actions = search_policy != 0
         P, V = self.run(state, avail_actions)
+        P[P == 0] = 1 # assign zero values to one so the log with make it zero
         loss = torch.mm((z-V), (z-V).t()) - torch.mm(torch.from_numpy(search_policy).float(), torch.log(P).t())
+        # print("loss first term: ",torch.mm((z-V), (z-V).t()))
+        # print("loss secod term ", torch.mm(torch.from_numpy(search_policy).float(), torch.log(P).t()))
+        # print(torch.from_numpy(search_policy).float())
+        # print(torch.log(P).t())
         print("Loss: ", loss)
         # optimizer = self.optimizer(learning_rate, C)
         self.optimizer.zero_grad()
@@ -180,7 +185,7 @@ class Node:
         del self.children_edges_ 
         self.board_ = None
         del self.parent_edge_
-        print("destruct node")
+        # print("destruct node")
 
     def getChildrenEdges(self, NN): 
         '''
@@ -201,10 +206,10 @@ class Node:
                 edge = Edge(self, P[0, idx], idx, move_dict[idx])
                 # print("ege: ", edge)
                 self.children_edges_.append(edge)
-        print("child edges size: ", len(self.children_edges_))
+        # print("child edges size: ", len(self.children_edges_))
         if len(self.children_edges_) == 0 :
             print("child edge length zero")
-        print("child edges appended")
+        # print("child edges appended")
         # print(self.children_edges_)
 
     def select(self, c_puct):

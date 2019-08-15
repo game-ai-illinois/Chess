@@ -20,15 +20,15 @@ def tree_search(node, NN, remain_iter, c_puct):
     else:
         if node.children_edges_ == [] : #if children edges not expanded
             node.getChildrenEdges(NN)#expand children edges
-            print("children edges size: ", len(node.children_edges_))
-            print("children edges expanded")
+            # print("children edges size: ", len(node.children_edges_))
+            # print("children edges expanded")
         select_idx = node.select(c_puct)
         selected_edge = node.children_edges_[select_idx]
         if selected_edge.child_node_ == None: #check if the edge has child node. if it doesn't, initiate node
             new_board = node.board_.copy()
             edge_move = chess.Move.from_uci(selected_edge.move_text_)
             new_board.push(edge_move)
-            print("picked move: ", selected_edge.move_text_)
+            # print("picked move: ", selected_edge.move_text_)
             selected_edge.child_node_ = Node(new_board, parent_edge = selected_edge)
         tree_search(selected_edge.child_node_, NN, remain_iter-1, c_puct)
 
@@ -69,12 +69,9 @@ def pickMove(node, temp, archive, v_resign = None):
         next_move_edge.child_node_ = Node(new_board, selected_edge)
     new_node = next_move_edge.child_node_
     del node # destruct the old parent node
-    print("old node destructed")
     new_node.parent_edge_.parent_node_ = None #the child node is now root node, thus its parent edge points to none
-    print("new node legal moves exist?: ", new_node.board_.legal_moves == None)
-    print(new_node.board_)
     # print("check new node pointer: ", next_move_edge.child_node_.parent_edge_.parent_node_ == None)
-    print("archive length: ", len(archive))
+    # print("archive length: ", len(archive))
     return new_node
 
 def stop_condition(node, v_resign):
@@ -110,19 +107,17 @@ def test(v_resign = None, newgame= True):
     resign = False
     time_out = False
     while not done:
-        print("current board: \n", current_node.board_)
-        print("tree search start")
+        # print("current board: \n", current_node.board_)
+        # print("tree search start")
         tree_search(current_node, nn, MCTS_iter, c_puct)
         # if stop_condition(current_node, 0.5):
         #     done = True
         #     break
-        print("tree search done")
         current_node = pickMove(current_node, temp, archive) 
         if current_node == "resign":
             resign = True
             print("resign game")
             break
-        print("pick move done")
         if current_node.board_.is_game_over(): 
             done = True
             print("done game")
@@ -135,13 +130,13 @@ def test(v_resign = None, newgame= True):
     
     winner_is_white = 0.0
     current_player_is_white = is_white(current_node.board_.fen())
-    print("is current player white?: ", current_player_is_white)
+    # print("is current player white?: ", current_player_is_white)
     if resign or time_out:
         if not current_player_is_white:
             winner_is_white = 1.0
         # else we do nothing as it's already 0.0
     else: #if gone all the way
-        print("result: ",current_node.board_.result())
+        # print("result: ",current_node.board_.result())
         if current_node.board_.result() == ("0-1" or "*"): # loss
             if not current_player_is_white:
                 winner_is_white = 1.0
@@ -155,7 +150,7 @@ def test(v_resign = None, newgame= True):
                 winner_is_white = 1.0
             print("Win")
             # else we do nothing as it's already 0.0
-    print("winner_is_white ", winner_is_white)
+    # print("winner_is_white ", winner_is_white)
     postProcess(archive, winner_is_white)
     return archive
 
