@@ -44,6 +44,9 @@ class NN(nn.Module):
 
         self.prob_mapper = nn.Softmax()
 
+
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate, weight_decay= C)
+
     # def train(self, train_data):
         
 
@@ -79,8 +82,8 @@ class NN(nn.Module):
         return V
 
 
-    def optimizer(self, learning_rate, C):
-        return torch.optim.Adam({self.tower.parameters(), self.policy_head.parameters(), self.value_head.parameters()}, lr=learning_rate, weight_decay= C)
+    # def optimizer(self, learning_rate, C):
+    #     return torch.optim.Adam({self.tower.parameters(), self.policy_head.parameters(), self.value_head.parameters()}, lr=learning_rate, weight_decay= C)
 
     def optimization(self, archive, learning_rate, C):
         '''
@@ -98,10 +101,10 @@ class NN(nn.Module):
         P, V = self.run(state, avail_actions)
         loss = torch.mm((z-V), (z-V).t()) - torch.mm(torch.from_numpy(search_policy).float(), torch.log(P).t())
         print("Loss: ", loss)
-        optimizer = self.optimizer(learning_rate, C)
-        optimizer.zero_grad()
+        # optimizer = self.optimizer(learning_rate, C)
+        self.optimizer.zero_grad()
         loss.backward()
-        optimizer.step()
+        self.optimizer.step()
 
 
 class Edge:
