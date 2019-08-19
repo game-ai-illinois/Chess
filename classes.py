@@ -21,7 +21,7 @@ class NN(nn.Module):
                     action_depth=4672,
                     board_width=8,
                     learning_rate = 0.001,
-                    C = 0.001,
+                    C = 0.0001, # L2 regularization
                     batch_size=32):
 
         super(NN, self).__init__()
@@ -57,8 +57,8 @@ class NN(nn.Module):
 
         self.prob_mapper = nn.Softmax()
 
-
         self.optimizer = torch.optim.Adam(self.parameters(), lr=learning_rate, weight_decay= C)
+        # self.optimizer = torch.optim.sgd(self.parameters(), lr=learning_rate, weight_decay= C, momentum = 0.9)
 
     # def train(self, train_data):
 
@@ -140,15 +140,33 @@ class NN(nn.Module):
         indices = list(range(len(archive)))
         random.shuffle(indices)
         count = 0
-        for i in range(math.ceil(len(archive) / self.batch_size)):
+        for i in range(math.ceil(len(archive) / self.batch_size)): #not sure if math ceil is necessary bc len() gives int
             curr_batch_size = min(self.batch_size, len(archive) - count)
             upper = count + curr_batch_size
-            curr_indices = indices[count:upper]
+            curr_indices = indices[count : upper]
             batch_state, batch_search_policy, batch_actions = state[curr_indices], search_policy[curr_indices], avail_actions[curr_indices]
             batch_z = z[curr_indices]
             P, V = self.run(batch_state, batch_actions)
             P[P == 0] = 1 # assign zero values to one so the log with make it zero
-            loss = torch.mm((batch_z-V), (batch_z-V).t()) - torch.mm(torch.from_numpy(batch_search_policy).float(), torch.log(P).t())
+            # print(batch_z.shape)
+            # print(V.shape)
+            # print((batch_z-V).shape)
+            # print((batch_z-V.t()).shape)
+            # print(torch.from_numpy(batch_search_policy).shape)
+            # print(torch.diag(torch.mm(torch.from_numpy(batch_search_policy).float(), torch.log(P).t())).shape)
+            loss_first_term = torch.mm((batch_z-V.t()).t(), (batch_z-V.t()))  # shape = (batch_size, batch_size)
+            # print(loss_first_term.shape)
+            # print(loss_first_term >= 0)
+            # print("log p: ", (torch.log(P).numpy() >= 0).all())
+            # print("pi : ", (batch_search_policy >= 0).all())
+            loss_second_term = torch.mm(torch.from_numpy(batch_search_policy).float(), torch.log(P).t()) # shape = (batch_size, batch_size)
+            # print(loss_second_term.shape)
+            # print(loss_second_term )
+            # print("batch search policy: ", torch.from_numpy(batch_search_policy).float() >= 0)
+            # print("log: ",torch.log(P).t() >= 0)
+            loss = torch.diag(loss_first_term + loss_second_term) #take the diag of the two terms to obtain the shape (batch_size, 1)
+            print("loss shape: ", loss.shape)
+            # print("loss non mean: ", loss)
             loss = torch.mean(loss)
             print("Loss: ", loss)
             self.optimizer.zero_grad()
@@ -213,21 +231,14 @@ class Node:
         self.state_ = input_state(board_state_string)
         self.is_black_ = not is_white(board_state_string)
 
-    def __del__(self, keep_child_idx = None):
+    def __del__(self):
 
         """
         Delete function for Node class
         """
         del self.board_
-        if keep_child_idx != None : # delete all edges except the one specified by keep_child_idx
-            for edge_idx in range(len(self.children_edges_)):
-                if edge_idx != keep_child_idx:
-                    del self.children_edges_[0]
-                else:
-                    l.pop(0) #pop the desired edge out
-        else:
-            for edge in self.children_edges_:
-                del edge
+        for edge in self.children_edges_:
+            del edge
         del self.children_edges_
         self.board_ = None
         del self.parent_edge_
@@ -258,7 +269,7 @@ class Node:
         # print("child edges appended")
         # print(self.children_edges_)
 
-    def select(self, c_puct):
+    def select(self, c_puct, self_play):
         '''
         returns indx of a child edge to select to play
         Clarification: this function does not pick a move to play
@@ -279,6 +290,12 @@ class Node:
         Q = np.array(Q)
         N_child = np.array(N_child)
         P = np.array(P)
+        if self_play:
+            eps = 0.25 
+            # print("P b4 dirichlet: ", P)
+            P = (1- eps)*P + eps*np.random.dirichlet(0.3 * np.ones(P.shape)) #add dirichlet noise if self play 
+            # print("P after dirichlet: ", P)
+            #dirichlet parameter is 0.3 for chess from https://medium.com/oracledevs/lessons-from-alphazero-part-3-parameter-tweaking-4dceb78ed1e5
         N_all = np.sum(N_child)
         U = c_puct* P* np.sqrt(N_all)/ (1 + N_child) #obtain the U values
         selected_child_idx = np.argmax(Q+U)

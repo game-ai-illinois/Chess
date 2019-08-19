@@ -5,7 +5,7 @@ import chess
 from classes import *
 from chess_env import *
 
-def tree_search(node, NN, remain_iter, c_puct):
+def tree_search(node, NN, remain_iter, c_puct, self_play):
     '''
     runs MCTS simulation once
     remain_iter argument gives remaining number of simulations iterations
@@ -22,7 +22,7 @@ def tree_search(node, NN, remain_iter, c_puct):
             node.getChildrenEdges(NN)#expand children edges
             # print("children edges size: ", len(node.children_edges_))
             # print("children edges expanded")
-        select_idx = node.select(c_puct)
+        select_idx = node.select(c_puct, self_play)
         selected_edge = node.children_edges_[select_idx]
         if selected_edge.child_node_ == None: #check if the edge has child node. if it doesn't, initiate node
             new_board = node.board_.copy()
@@ -30,9 +30,9 @@ def tree_search(node, NN, remain_iter, c_puct):
             new_board.push(edge_move)
             # print("picked move: ", selected_edge.move_text_)
             selected_edge.child_node_ = Node(new_board, parent_edge = selected_edge)
-        tree_search(selected_edge.child_node_, NN, remain_iter-1, c_puct)
+        tree_search(selected_edge.child_node_, NN, remain_iter-1, c_puct, self_play)
 
-def pickMove(node, temp, archive, v_resign = None):
+def pickMove(node, temp, archive, v_resign):
     '''
     Makes a move and picks the next node (state) to go to
     archive is a list of data to later used for training
@@ -47,6 +47,7 @@ def pickMove(node, temp, archive, v_resign = None):
     N_vector_array = np.zeros(4672)
     # print("node.children_edges_ length: ",len(node.children_edges_))
     for child_edge in node.children_edges_:
+        # print("child_edge.N_: ",child_edge.N_)
         value = child_edge.N_**(1/temp)
         # print("value: ", value)
         N_vector.append(value)
@@ -92,28 +93,40 @@ def stop_condition(node, v_resign):
 
 
 
-def test(v_resign = None, newgame= True):
-    if newgame == True:
-        nn = NN(12, 1, 1)
+def test( white, black, v_resign = None, self_play = True):
+    """
+    function that takes in white and black players (neural network) and 
+    make them play against one another
+    """
     c_puct = 0.5
-    MCTS_iter = 10 #number of time we iterate over
+    MCTS_iter = 25 # how deep we do MCTS
     board = chess.Board() # initialize new game
     start_edge = Edge(None, 0, 0, "a0b1") #initialize edge to notify starting node as root
     current_node = Node(board, start_edge) #initialize node
     archive = [] #initialize archive
-    temp = 0.4 
     done = False
     num_steps = 0
     resign = False
     time_out = False
+    step = 1
+    if self_play: #when test is used for self play, temp starts with 1
+        temp = 1
+    else:
+        temp = 0.01 #when test is used for evaluation, temp starts very small
+    which_network = 0
     while not done:
         # print("current board: \n", current_node.board_)
         # print("tree search start")
-        tree_search(current_node, nn, MCTS_iter, c_puct)
+        if which_network % 2 == 0:
+            network = white
+        else:
+            network = black
+        tree_search(current_node, network, MCTS_iter, c_puct, self_play)
         # if stop_condition(current_node, 0.5):
         #     done = True
         #     break
-        current_node = pickMove(current_node, temp, archive) 
+        # print("temp: ", temp)
+        current_node = pickMove(current_node, temp, archive, v_resign) 
         if current_node == "resign":
             resign = True
             print("resign game")
@@ -123,15 +136,17 @@ def test(v_resign = None, newgame= True):
             print("done game")
         # print("board: ", current_node.board_)
         num_steps += 1
-        if num_steps >= 300 :
+        if num_steps >= 200 :
             time_out = True
-            print("time out")
+            # print("time out")
             break
+        if step > 30:
+            temp = 0.01
     
     winner_is_white = 0.0
     current_player_is_white = is_white(current_node.board_.fen())
     # print("is current player white?: ", current_player_is_white)
-    if resign or time_out:
+    if resign:
         if not current_player_is_white:
             winner_is_white = 1.0
         # else we do nothing as it's already 0.0
@@ -142,9 +157,12 @@ def test(v_resign = None, newgame= True):
                 winner_is_white = 1.0
             print("lose")
             # else we do nothing as it's already 0.0
-        elif current_node.board_.result() == "1/2-1/2": # draw
+        elif current_node.board_.result() == "1/2-1/2" : # draw
             winner_is_white = 0.5
             print("draw")
+        elif time_out : # draw
+            winner_is_white = 0.5 # score is same as draw
+            print("time_out")
         else: # win
             if current_player_is_white:
                 winner_is_white = 1.0
@@ -152,10 +170,10 @@ def test(v_resign = None, newgame= True):
             # else we do nothing as it's already 0.0
     # print("winner_is_white ", winner_is_white)
     postProcess(archive, winner_is_white)
-    return archive
+    return archive, winner_is_white
 
-def train(NN, archive, learning_rate, C):
-    NN.optimization(archive, learning_rate, C)
+def train(NN, archive):
+    NN.optimization(archive)
 
 def postProcess(archive, winner_is_white):
 
