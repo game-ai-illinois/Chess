@@ -291,7 +291,7 @@ def return_legal_moves(board, is_black):
     #     # print([move for move in board.legal_moves])
     return legal_moves_array, move_dict
 
-def random_play(board, NN):
+def random_play(board, NN, device="cpu"):
     """
     takes in neural network and the list of legal moves from chess env
     obtains numpy array of probability distribution of legal moves
@@ -306,7 +306,7 @@ def random_play(board, NN):
     legal_moves_array, move_dict = return_legal_moves(board, is_black)
     # print("state array shape: ", state_array.shape)
     # print("legal array sahpe: ", legal_moves_array.shape)
-    legal_moves_prob_distribution, _ = (NN.run(state_array, legal_moves_array))  #we're assuming that NN forward runs the neural network
+    legal_moves_prob_distribution, _ = (NN.run(state_array, legal_moves_array, device=device))  #we're assuming that NN forward runs the neural network
     # legal_moves_prob_distribution = legal_moves_prob_distribution / np.sum(legal_moves_prob_distribution) # normalize
     legal_moves_prob_distribution = legal_moves_prob_distribution.numpy().reshape(4672)
     # legal_moves_prob_distribution = legal_moves_prob_distribution - np.min(legal_moves_prob_distribution)

@@ -63,14 +63,14 @@ class NN(nn.Module):
     # def train(self, train_data):
 
 
-    def run(self, state, avail_actions):
+    def run(self, state, avail_actions, device="cpu"):
         '''
         runs the network with data (analogous to "forward") to obtain
         policy (P), a vector quantity, and value (V), a scalar quantity
         both the state and avail_actions are assumed to be np arrays
         '''
-        state = torch.from_numpy(state).float() #turn state and avail_actions into torch tensors
-        avail_actions = torch.from_numpy(avail_actions).float()
+        state = torch.from_numpy(state).float().to(device) #turn state and avail_actions into torch tensors
+        avail_actions = torch.from_numpy(avail_actions.astype(np.float32)).to(device)
         tower = self.tower(state)
         policy_logits = self.policy_head(tower)
         policy_logits = (avail_actions * (policy_logits- torch.min(policy_logits)))
@@ -98,7 +98,7 @@ class NN(nn.Module):
     # def optimizer(self, learning_rate, C):
     #     return torch.optim.Adam({self.tower.parameters(), self.policy_head.parameters(), self.value_head.parameters()}, lr=learning_rate, weight_decay= C)
 
-    def optimization(self, archive):
+    def optimization(self, archive, device="cpu"):
         '''
         trains the network with given training data
         '''
@@ -135,7 +135,7 @@ class NN(nn.Module):
             z.append(data[-1])
         state = np.vstack(state)
         search_policy = np.vstack(search_policy)
-        z = torch.FloatTensor(z)  #turn list into torch tensor
+        z = torch.FloatTensor(z).to(device)  #turn list into torch tensor
         avail_actions = search_policy != 0
         indices = list(range(len(archive)))
         random.shuffle(indices)
@@ -146,7 +146,7 @@ class NN(nn.Module):
             curr_indices = indices[count : upper]
             batch_state, batch_search_policy, batch_actions = state[curr_indices], search_policy[curr_indices], avail_actions[curr_indices]
             batch_z = z[curr_indices]
-            P, V = self.run(batch_state, batch_actions)
+            P, V = self.run(batch_state, batch_actions, device=device)
             P[P == 0] = 1 # assign zero values to one so the log with make it zero
             # print(batch_z.shape)
             # print(V.shape)
@@ -159,7 +159,7 @@ class NN(nn.Module):
             # print(loss_first_term >= 0)
             # print("log p: ", (torch.log(P).numpy() >= 0).all())
             # print("pi : ", (batch_search_policy >= 0).all())
-            loss_second_term = torch.mm(torch.from_numpy(batch_search_policy).float(), torch.log(P).t()) # shape = (batch_size, batch_size)
+            loss_second_term = torch.mm(torch.from_numpy(batch_search_policy).float().to(device), torch.log(P).t()) # shape = (batch_size, batch_size)
             # print(loss_second_term.shape)
             # print(loss_second_term )
             # print("batch search policy: ", torch.from_numpy(batch_search_policy).float() >= 0)
@@ -218,7 +218,7 @@ class Node:
     A Node class that represents a node in a MCTS as stated in the paper
     "Mastering the game of Go without human knowledge"
     """
-    def __init__(self, board, parent_edge):
+    def __init__(self, board, parent_edge, device="cpu", resign=False):
         '''
         We use the state and Neural Network to obtain prior probability (P_)
         and evaluation of value of the node (V_)
@@ -230,6 +230,7 @@ class Node:
         board_state_string = self.board_.fen()
         self.state_ = input_state(board_state_string)
         self.is_black_ = not is_white(board_state_string)
+        self.resign = resign
 
     def __del__(self):
 
@@ -244,7 +245,7 @@ class Node:
         del self.parent_edge_
         # print("destruct node")
 
-    def getChildrenEdges(self, NN):
+    def getChildrenEdges(self, NN, device):
         '''
         obtains all the children nodes from interacting with the chess env
         '''
@@ -255,7 +256,7 @@ class Node:
         # print("state array shape: ", state_array.shape)
         # print("legal array shape: ", legal_moves_array.shape)
         # print(type(legal_moves_array))
-        P, _ = (NN.run(state_array, legal_moves_array)) # P.shape is (1, 4672)
+        P, _ = (NN.run(state_array, legal_moves_array, device=device)) # P.shape is (1, 4672)
         # print("P shape: ", P.shape)
         for idx in range(4672): #as the legal_moves_array.shape is (1, 4672)
             if legal_moves_array[0, idx] != 0:
@@ -291,9 +292,9 @@ class Node:
         N_child = np.array(N_child)
         P = np.array(P)
         if self_play:
-            eps = 0.25 
+            eps = 0.25
             # print("P b4 dirichlet: ", P)
-            P = (1- eps)*P + eps*np.random.dirichlet(0.3 * np.ones(P.shape)) #add dirichlet noise if self play 
+            P = (1- eps)*P + eps*np.random.dirichlet(0.3 * np.ones(P.shape)) #add dirichlet noise if self play
             # print("P after dirichlet: ", P)
             #dirichlet parameter is 0.3 for chess from https://medium.com/oracledevs/lessons-from-alphazero-part-3-parameter-tweaking-4dceb78ed1e5
         N_all = np.sum(N_child)

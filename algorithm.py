@@ -5,7 +5,7 @@ import chess
 from classes import *
 from chess_env import *
 
-def tree_search(node, NN, remain_iter, c_puct, self_play):
+def tree_search(node, NN, remain_iter, c_puct, self_play, device="cpu"):
     '''
     runs MCTS simulation once
     remain_iter argument gives remaining number of simulations iterations
@@ -15,11 +15,11 @@ def tree_search(node, NN, remain_iter, c_puct, self_play):
     if remain_iter == 0 or node.board_.is_game_over(): #evaluate value from NN
         state_array = node.state_ #obtain state for NN
         is_black = node.is_black_
-        _, value = (NN.run(state_array, np.ones(4672)))
+        _, value = (NN.run(state_array, np.ones(4672), device=device))
         node.parent_edge_.rollback(value) #rollback value
     else:
         if node.children_edges_ == [] : #if children edges not expanded
-            node.getChildrenEdges(NN)#expand children edges
+            node.getChildrenEdges(NN, device=device)#expand children edges
             # print("children edges size: ", len(node.children_edges_))
             # print("children edges expanded")
         select_idx = node.select(c_puct, self_play)
@@ -30,7 +30,7 @@ def tree_search(node, NN, remain_iter, c_puct, self_play):
             new_board.push(edge_move)
             # print("picked move: ", selected_edge.move_text_)
             selected_edge.child_node_ = Node(new_board, parent_edge = selected_edge)
-        tree_search(selected_edge.child_node_, NN, remain_iter-1, c_puct, self_play)
+        tree_search(selected_edge.child_node_, NN, remain_iter-1, c_puct, self_play, device=device)
 
 def pickMove(node, temp, archive, v_resign):
     '''
@@ -41,8 +41,9 @@ def pickMove(node, temp, archive, v_resign):
         child_action_values = []
         for child_edge in node.children_edges_: #obtain the aciton values of child edges
             child_action_values.append(child_edge.Q_)
-        if node.parent_edge_.Q_ and max(child_action_values) < v_resign : #resign   
-            return "resign"
+        if node.parent_edge_.Q_ and max(child_action_values) < v_resign : #resign
+            out_node = Node(node.board_.board.copy(), selected_edge, resign=True)
+            return out_node
     N_vector = [] # vector of N^(1/temp) values of all children
     N_vector_array = np.zeros(4672)
     # print("node.children_edges_ length: ",len(node.children_edges_))
@@ -54,8 +55,8 @@ def pickMove(node, temp, archive, v_resign):
         N_vector_array[child_edge.move_idx_] = value
     N_vector = np.array(N_vector) # make it np array
     # print("N_vector: ", N_vector)
-    N_vector = N_vector/np.sum(N_vector) # normalize to make it a probability distribution 
-    N_vector_array = N_vector_array / np.sum(N_vector_array) 
+    N_vector = N_vector/np.sum(N_vector) # normalize to make it a probability distribution
+    N_vector_array = N_vector_array / np.sum(N_vector_array)
     white_turn = is_white(node.board_.fen())
     archive.append([node.state_, N_vector_array, white_turn, None]) # before picking the move, add data to archive. The winner is added later
     # print("N_vector shape: ", N_vector.shape)
@@ -80,7 +81,7 @@ def stop_condition(node, v_resign):
         return False
     #obtain best child value
     values = []
-    for edge in node.children_edges_ : 
+    for edge in node.children_edges_ :
         values.append(edge.Q_)
     best_value = max(values)
     if len(values) == 0:
@@ -93,9 +94,9 @@ def stop_condition(node, v_resign):
 
 
 
-def test( white, black, v_resign = None, self_play = True):
+def test( white, black, v_resign = None, self_play = True, device="cpu"):
     """
-    function that takes in white and black players (neural network) and 
+    function that takes in white and black players (neural network) and
     make them play against one another
     """
     c_puct = 0.5
@@ -121,17 +122,17 @@ def test( white, black, v_resign = None, self_play = True):
             network = white
         else:
             network = black
-        tree_search(current_node, network, MCTS_iter, c_puct, self_play)
+        tree_search(current_node, network, MCTS_iter, c_puct, self_play, device=device)
         # if stop_condition(current_node, 0.5):
         #     done = True
         #     break
         # print("temp: ", temp)
-        current_node = pickMove(current_node, temp, archive, v_resign) 
+        current_node = pickMove(current_node, temp, archive, v_resign)
         if current_node == "resign":
             resign = True
             print("resign game")
             break
-        if current_node.board_.is_game_over(): 
+        if current_node.board_.is_game_over():
             done = True
             print("done game")
         # print("board: ", current_node.board_)
@@ -142,7 +143,7 @@ def test( white, black, v_resign = None, self_play = True):
             break
         if step > 30:
             temp = 0.01
-    
+
     winner_is_white = 0.0
     current_player_is_white = is_white(current_node.board_.fen())
     # print("is current player white?: ", current_player_is_white)
@@ -172,8 +173,8 @@ def test( white, black, v_resign = None, self_play = True):
     postProcess(archive, winner_is_white)
     return archive, winner_is_white
 
-def train(NN, archive):
-    NN.optimization(archive)
+def train(NN, archive, device="cpu"):
+    NN.optimization(archive, device=device)
 
 def postProcess(archive, winner_is_white):
 
@@ -186,4 +187,3 @@ def postProcess(archive, winner_is_white):
         else:
             data[-1] = -1.0
     # print("archive length: ", len(archive))
-
