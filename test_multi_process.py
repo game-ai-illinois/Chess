@@ -49,9 +49,15 @@ if __name__ == '__main__':
         #evaluate
         evaluate_n_games = 80
         n_white_wins = 0.0
+        how_many_black_won = 0
+        how_many_draws = 0
         for game in range(evaluate_n_games):
             _, winner_is_white = test(white, black, self_play = False, device=device) #if draw, winner_is_white == 0.5
             n_white_wins += winner_is_white
+            if winner_is_white ==1.0 :
+                how_many_black_won += 1
+            elif winner_is_white == 0.5:
+                how_many_draws += 1
         print("ratio: ", (evaluate_n_games - n_white_wins)/evaluate_n_games)
         if (evaluate_n_games - n_white_wins)/evaluate_n_games > 0.55: #if black won at least 55 % of the games then black becomes the new current best network
             print("black is the new best")
