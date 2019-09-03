@@ -27,10 +27,10 @@ if __name__ == '__main__':
 
     for iteration in range(n_iterations):
         #self play
-        p1 = mp.Process(target=test_multiprocess, args=(archive, self_play_n_games//3, black, black, device))
-        p2 = mp.Process(target=test_multiprocess, args=(archive, self_play_n_games//3, black, black, device))
-        p3 = mp.Process(target=test_multiprocess, args=(archive, self_play_n_games//3, black, black, device))
-        # p4 = mp.Process(target=test_multiprocess, args=(self_play_n_games//4, black, black, device))
+        p1 = mp.Process(target=test_multiprocess, args=(archive, self_play_n_games//3, white, black, device))
+        p2 = mp.Process(target=test_multiprocess, args=(archive, self_play_n_games//3, white, black, device))
+        p3 = mp.Process(target=test_multiprocess, args=(archive, self_play_n_games//3, white, black, device))
+        # p4 = mp.Process(target=test_multiprocess, args=(self_play_n_games//4, white, black, device))
         p1.start()
         p2.start()
         p3.start()
