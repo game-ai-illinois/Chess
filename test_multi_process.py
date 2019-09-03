@@ -59,6 +59,8 @@ if __name__ == '__main__':
             elif winner_is_white == 0.5:
                 how_many_draws += 1
         print("ratio: ", (evaluate_n_games - n_white_wins)/evaluate_n_games)
+        print("number of blacks win: ", how_many_black_won)
+        print("number of draws: ", how_many_draws)
         if (evaluate_n_games - n_white_wins)/evaluate_n_games > 0.55: #if black won at least 55 % of the games then black becomes the new current best network
             print("black is the new best")
             torch.save(black.state_dict(), "./models/model.json") #save the model
