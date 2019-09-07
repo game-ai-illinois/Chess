@@ -5,7 +5,7 @@ from chess_env import *
 from classes import *
 from algorithm import *
 import copy
-mport time
+import time
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 t0 = time.time()
@@ -16,8 +16,8 @@ white = NN( input_size, 256, 19).to(device)
 black = NN( input_size, 256, 19).to(device)
 white.load_state_dict(torch.load("./models/model.json"))
 black.load_state_dict(torch.load("./models/model.json"))
-self_play_n_games = 9#400 #on the paper it's 25k and 16k simulation b4 each move, though the paper is on go where average legal moves are much higher
-for iteration in range(n_iterations):
+self_play_n_games = 12#400 #on the paper it's 25k and 16k simulation b4 each move, though the paper is on go where average legal moves are much higher
+for iteration in range(1): #prev n_iterations
     #self play
     v_resign = 0.05 #arbitrary high number
     archive = []

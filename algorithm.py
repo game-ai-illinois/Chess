@@ -102,14 +102,13 @@ def test( white, black, v_resign = None, self_play = True, device="cpu"):
     c_puct = 0.5
     MCTS_iter = 25 # how deep we do MCTS
     board = chess.Board() # initialize new game
-    start_edge = Edge(None, 0, 0, "a0b1") #initialize edge to notify starting node as root
+    start_edge = Edge(None, 0, 0, "a0b1") #initialize edge to notify starting node as root. a0b1 here doesn't mean anything
     current_node = Node(board, start_edge) #initialize node
     archive = [] #initialize archive
     done = False
     num_steps = 0
     resign = False
     time_out = False
-    step = 1
     if self_play: #when test is used for self play, temp starts with 1
         temp = 1
     else:
@@ -122,6 +121,7 @@ def test( white, black, v_resign = None, self_play = True, device="cpu"):
             network = white
         else:
             network = black
+        which_network += 1
         tree_search(current_node, network, MCTS_iter, c_puct, self_play, device=device)
         # if stop_condition(current_node, 0.5):
         #     done = True
@@ -134,14 +134,14 @@ def test( white, black, v_resign = None, self_play = True, device="cpu"):
             break
         if current_node.board_.is_game_over():
             done = True
-            print("done game")
+            # print("done game")
         # print("board: ", current_node.board_)
         num_steps += 1
         if num_steps >= 200 :
             time_out = True
             # print("time out")
             break
-        if step > 30:
+        if num_steps > 30:
             temp = 0.01
 
     winner_is_white = 0.0
@@ -173,6 +173,19 @@ def test( white, black, v_resign = None, self_play = True, device="cpu"):
     postProcess(archive, winner_is_white)
     return archive, winner_is_white
 
+def test_multiprocess(archive, iteration, white, black, device, self_play, total_n_black_wins, total_n_draws, v_resign = None):
+    for i in range(iteration):
+        smaller_archive, winner_is_white = test( white, black, v_resign = v_resign, self_play = self_play, device= device)
+        if winner_is_white != 0.5: #if draw, don't add smaller_archive to archive
+            archive += smaller_archive
+        print("winner_is_white: ", winner_is_white)
+        if not self_play :
+            if winner_is_white < 0.5 :
+                total_n_black_wins[0] += 1
+            elif winner_is_white == 0.5 :
+                total_n_draws[0] += 1
+
+
 def train(NN, archive, device="cpu"):
     NN.optimization(archive, device=device)
 
@@ -187,3 +200,29 @@ def postProcess(archive, winner_is_white):
         else:
             data[-1] = -1.0
     # print("archive length: ", len(archive))
+
+def play_with_human(board, network, device="cpu", v_resign = None, self_play = True):
+    """
+    function that takes in a network and human moves to allow the network to play against
+    human playersa
+    """
+    c_puct = 0.5
+    MCTS_iter = 25 # how deep we do MCTS
+    start_edge = Edge(None, 0, 0, "a0b1") #initialize edge to notify starting node as root. a0b1 here doesn't mean anything
+    current_node = Node(board, start_edge) #initialize node
+    done = False
+    temp = 0.01 #when test is used for evaluation, temp starts very small
+    if current_node == "resign":
+        resign = True
+        print("resign game")
+        return None
+    if current_node.board_.is_game_over():
+        print("done game")
+        return None
+    archive = []
+    tree_search(current_node, network, MCTS_iter, c_puct, self_play, device=device)
+    current_node = pickMove(current_node, temp, archive, v_resign)
+    board = current_node.board_
+    # for move in board.legal_moves :
+    #     print(move)
+    return board
