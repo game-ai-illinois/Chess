@@ -35,6 +35,7 @@ class NN(nn.Module):
         for i in range(num_residual_layers):
             self.tower.add_module("resid"+str(i+1),
                                     ResidualBlock(num_features))
+        # torch.nn.init.xavier_uniform(self.tower.weight)
 
         self.policy_head = nn.Sequential(
             nn.Conv2d(num_features, 2, kernel_size=1, stride=1),

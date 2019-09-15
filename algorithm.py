@@ -153,7 +153,8 @@ def test( white, black, v_resign = None, self_play = True, device="cpu"):
         # else we do nothing as it's already 0.0
     else: #if gone all the way
         # print("result: ",current_node.board_.result())
-        if current_node.board_.result() == ("0-1" or "*"): # loss
+        print(current_node.board_.result() )
+        if current_node.board_.result() == ("0-1"): # loss
             if not current_player_is_white:
                 winner_is_white = 1.0
             print("lose")
@@ -162,13 +163,15 @@ def test( white, black, v_resign = None, self_play = True, device="cpu"):
             winner_is_white = 0.5
             print("draw")
         elif time_out : # draw
-            winner_is_white = 0.5 # score is same as draw
+            winner_is_white = 0.27 # specific score for time out
             print("time_out")
         else: # win
             if current_player_is_white:
                 winner_is_white = 1.0
             print("Win")
             # else we do nothing as it's already 0.0
+        print(current_node.board_.fen() )
+        print(current_node.board_)
     # print("winner_is_white ", winner_is_white)
     postProcess(archive, winner_is_white)
     return archive, winner_is_white
@@ -195,13 +198,23 @@ def postProcess(archive, winner_is_white):
     when the game is finished and data is updated for training
     """
     for data in archive:
-        if data[-2] == winner_is_white: #if winner matches with the current player
-            data[-1] = 1.0
-        else:
-            data[-1] = -1.0
+        if winner_is_white == 0.27: #if time out
+            data[-1] = 0.0 # make it undesirable for both sides
+        elif winner_is_white ==0.5: #if draw
+            data[-1] = 0.5
+        elif winner_is_white == 1.0: #if win
+            if data[-2] : #if white's turn
+                data[-1] = 1.0
+            else: #if black's turn
+                data[-1] = 0.0
+        else: #if lose
+            if data[-2] : #if white's turn
+                data[-1] = 0.0
+            else: #if black's turn
+                data[-1] = 1.0
     # print("archive length: ", len(archive))
 
-def play_with_human(board, network, device="cpu", v_resign = None, self_play = True):
+def play_with_human(board, network, device="cpu", v_resign = None, self_play = False):
     """
     function that takes in a network and human moves to allow the network to play against
     human playersa
@@ -217,8 +230,8 @@ def play_with_human(board, network, device="cpu", v_resign = None, self_play = T
         print("resign game")
         return None
     if current_node.board_.is_game_over():
-        print("done game")
-        return None
+        # print("done game")
+        return board
     archive = []
     tree_search(current_node, network, MCTS_iter, c_puct, self_play, device=device)
     current_node = pickMove(current_node, temp, archive, v_resign)
