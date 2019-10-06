@@ -213,6 +213,59 @@ class Edge:
         if self.parent_node_ != None :
             self.parent_node_.parent_edge_.rollback(value)
 
+class TraversedEdge:
+
+    def __init__(self, edge_dict, ind, child_node=None):
+        self.edge_dict = edge_dict
+        self.ind = ind
+        self.parent_node_ = parent_node
+        self.child_node_ = child_node
+        self.N_, self.W_, self.W_, self.P_ = self.edge_dict.edges[ind]
+        self.move_idx = ind
+        self.move_text = self.edge_dict.move_texts[ind]
+
+    def rollback(self, value):
+        self.edge_dict[self.ind,0] += 1
+        self.edge_dict[self.ind,1] += value
+        self.edge_dict[self.ind,2] = self.edge_dict[self.ind,1] / self.edge_dict[self.ind,0]
+        if self.edge_dict.parent_node != None:
+            self.parent_node_.parent_edge_.rollback(value)
+        self.N_, self.W_, self.W_, self.P_ = self.edge_dict.edges[ind]
+
+
+
+class ChildrenEdgeDict:
+
+    """
+        Class for storing all the information from all possible child edges in one large array
+
+        Vectorized data structure to speed up execution of following logic in getChildrenEdges:
+
+        for idx in range(4672): #as the legal_moves_array.shape is (1, 4672)
+            if legal_moves_array[0, idx] != 0:
+                edge = Edge(self, P[0, idx], idx, move_dict[idx])
+                self.children_edges_.append(edge)
+
+        size: number of edges
+        parent_node: parent node pointer
+        legal_moves_array: binary array indicating which moves are available
+        probabilities: prob array of size (size,)
+        move_dict: dictionary mapping action indices to next states
+
+    """
+    def __init__(self, size, parent_node, legal_moves_array, probabilities, move_dict):
+        self.edges_ = np.zeros((size, 4))
+        self.parent_node = parent_node
+        self.edges[:,:3] = 0.0 # [0,1,2] -> [N_, W_, Q_]
+
+        self.legal_inds = legal_moves_array.nonzero()
+        self.move_inds, self.move_texts = move_dict.keys(), move_dict.values()
+        assert ((self.legal_inds == self.move_inds).all())
+        self.edges[legal_inds,3] = probabilities[legal_inds] # [3] -> [P_]
+
+    def __getitem__(self, key):
+        return TraversedEdge(self, key)
+
 
 class Node:
     """
@@ -239,8 +292,6 @@ class Node:
         Delete function for Node class
         """
         del self.board_
-        for edge in self.children_edges_:
-            del edge
         del self.children_edges_
         self.board_ = None
         del self.parent_edge_
@@ -259,15 +310,27 @@ class Node:
         # print(type(legal_moves_array))
         P, _ = (NN.run(state_array, legal_moves_array, device=device)) # P.shape is (1, 4672)
         # print("P shape: ", P.shape)
+        """
+
+        # UNCOMMENT THIS MULTI LINE COMMENT TO ACTIVATE VECTORIZED EDGE PROCESSING
+
+        # __init__(self, size, parent_node, legal_moves_array, probabilities, move_dict)
+        self.children_edges_ = ChildrenEdgeDict(4672, self,legal_moves_array, P, move_dict)
+
+        """
+        """
+        # BEGIN OF OLD NONVECTORIZED CODE
+        """
         for idx in range(4672): #as the legal_moves_array.shape is (1, 4672)
             if legal_moves_array[0, idx] != 0:
                 # print("legal move recognized")
                 edge = Edge(self, P[0, idx], idx, move_dict[idx])
                 # print("ege: ", edge)
                 self.children_edges_.append(edge)
+        """
+        # END OF OLD NONVECTORIZED CODE
+        """
         # print("child edges size: ", len(self.children_edges_))
-        if len(self.children_edges_) == 0 :
-            print("child edge length zero")
         # print("child edges appended")
         # print(self.children_edges_)
 
@@ -282,6 +345,17 @@ class Node:
         if self.children_edges_ == []:
             print("children nodes not initialized")
             return None
+
+        """
+
+        # UNCOMMENT THIS MULTI LINE COMMENT TO ACTIVATE VECTORIZED EDGE PROCESSING
+        arr = self.children_edges_.edges
+        [N_child, W, Q, P] = arr.transpose()
+
+        """
+        """
+        # BEGIN OF OLD NONVECTORIZED CODE
+        """
         Q = []# initialize to obtain Q values
         N_child = [] # initialize to obtain N of each child
         P = []
@@ -292,6 +366,9 @@ class Node:
         Q = np.array(Q)
         N_child = np.array(N_child)
         P = np.array(P)
+        """
+        # END OF OLD NONVECTORIZED CODE
+        """
         if self_play:
             eps = 0.25
             # print("P b4 dirichlet: ", P)

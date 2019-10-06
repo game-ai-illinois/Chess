@@ -4,6 +4,7 @@ import torch.nn as nn
 import chess
 from classes import *
 from chess_env import *
+import time
 
 def tree_search(node, NN, remain_iter, c_puct, self_play, device="cpu"):
     '''
@@ -18,11 +19,15 @@ def tree_search(node, NN, remain_iter, c_puct, self_play, device="cpu"):
         _, value = (NN.run(state_array, np.ones(4672), device=device))
         node.parent_edge_.rollback(value) #rollback value
     else:
+        t1 = time.time()
         if node.children_edges_ == [] : #if children edges not expanded
             node.getChildrenEdges(NN, device=device)#expand children edges
             # print("children edges size: ", len(node.children_edges_))
             # print("children edges expanded")
+        print("getChildrenEdges: %f" % (time.time() - t1))
+        t2 = time.time()
         select_idx = node.select(c_puct, self_play)
+        print("select_idx: %f" % (time.time()-t2))
         selected_edge = node.children_edges_[select_idx]
         if selected_edge.child_node_ == None: #check if the edge has child node. if it doesn't, initiate node
             new_board = node.board_.copy()
@@ -30,6 +35,7 @@ def tree_search(node, NN, remain_iter, c_puct, self_play, device="cpu"):
             new_board.push(edge_move)
             # print("picked move: ", selected_edge.move_text_)
             selected_edge.child_node_ = Node(new_board, parent_edge = selected_edge)
+        print("One search iter: %f. remain iter: %d " % (time.time()-t1, remain_iter))
         tree_search(selected_edge.child_node_, NN, remain_iter-1, c_puct, self_play, device=device)
 
 def pickMove(node, temp, archive, v_resign):
@@ -38,9 +44,22 @@ def pickMove(node, temp, archive, v_resign):
     archive is a list of data to later used for training
     '''
     if v_resign != None: #if we are assigned a v_resign value
+
+        """
+        # UNCOMMENT FOR VECTORIZED CODE
+
+        child_action_values = node.children_edges_.edges[:,2]
+        """
+
+        """
+        BEGIN OLD UNVECTORIZED CODE
+        """
         child_action_values = []
         for child_edge in node.children_edges_: #obtain the aciton values of child edges
             child_action_values.append(child_edge.Q_)
+        """
+        END OLD UNVECTORIZED CODE
+        """
         if node.parent_edge_.Q_ and max(child_action_values) < v_resign : #resign
             out_node = Node(node.board_.board.copy(), selected_edge, resign=True)
             return out_node
@@ -122,12 +141,17 @@ def test( white, black, v_resign = None, self_play = True, device="cpu"):
         else:
             network = black
         which_network += 1
+        t1 = time.time()
         tree_search(current_node, network, MCTS_iter, c_puct, self_play, device=device)
+        t2 = time.time()
+        print("One iter of tree_search: %f" % (t2-t1))
         # if stop_condition(current_node, 0.5):
         #     done = True
         #     break
         # print("temp: ", temp)
+        t1 = time.time()
         current_node = pickMove(current_node, temp, archive, v_resign)
+        print("Move pick: %f" % (time.time()-t1))
         if current_node == "resign":
             resign = True
             print("resign game")
