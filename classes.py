@@ -218,19 +218,40 @@ class TraversedEdge:
     def __init__(self, edge_dict, ind, child_node=None):
         self.edge_dict = edge_dict
         self.ind = ind
-        self.parent_node_ = parent_node
+        self.parent_node_ = edge_dict.parent_node
         self.child_node_ = child_node
-        self.N_, self.W_, self.W_, self.P_ = self.edge_dict.edges[ind]
-        self.move_idx = ind
-        self.move_text = self.edge_dict.move_texts[ind]
+        self.N_, self.W_, self.W_, self.P_ = self.edge_dict.edges_[ind]
+        self.move_idx_ = ind
+        print(self.edge_dict.move_dict, ind)
+        self.move_text_ = self.edge_dict.move_dict[ind]
 
-    def rollback(self, value):
-        self.edge_dict[self.ind,0] += 1
-        self.edge_dict[self.ind,1] += value
-        self.edge_dict[self.ind,2] = self.edge_dict[self.ind,1] / self.edge_dict[self.ind,0]
-        if self.edge_dict.parent_node != None:
-            self.parent_node_.parent_edge_.rollback(value)
-        self.N_, self.W_, self.W_, self.P_ = self.edge_dict.edges[ind]
+        """
+        if (str(self.move_inds[ind]) in self.edge_dict.move_inds):
+            self.move_text_ = self.edge_dict.move_dict[ind]
+        """
+
+    def rollback(self, value, move_count_dict):
+
+        dict_in = self.parent_node_.s # + " WITH ACTION " + str(self.ind)
+
+        if (dict_in not in move_count_dict.keys()):
+            move_count_dict[dict_in] = {str(self.ind): [1, value, value, self.P_]}
+            self.edge_dict.edges_[self.ind,0] += 1
+            self.edge_dict.edges_[self.ind,1] += value
+            self.edge_dict.edges_[self.ind,2] = self.edge_dict.edges_[self.ind,1] / self.edge_dict.edges_[self.ind,0]
+        else:
+            [N,V,W,P] = move_count_dict[dict_in]
+            N += 1
+            V += value
+            W = V / N
+            move_count_dict[dict_in][str(self.ind)] = [N,V,W,P]
+            self.edge_dict.edges_[self.ind,0] = N
+            self.edge_dict.edges_[self.ind,1] = V
+            self.edge_dict.edges_[self.ind,2] = W
+        if self.parent_node != None:
+            self.parent_node_.parent_edge_.rollback(value, move_count_dict)
+        self.N_, self.W_, self.W_, self.P_ = self.edge_dict.edges_[ind]
+
 
 
 
@@ -253,15 +274,17 @@ class ChildrenEdgeDict:
         move_dict: dictionary mapping action indices to next states
 
     """
-    def __init__(self, size, parent_node, legal_moves_array, probabilities, move_dict):
+    def __init__(self, size, parent_node, legal_moves_array, probabilities, move_dict, move_count_dict):
         self.edges_ = np.zeros((size, 4))
         self.parent_node = parent_node
-        self.edges[:,:3] = 0.0 # [0,1,2] -> [N_, W_, Q_]
+        self.edges_[:,:3] = 0.0 # [0,1,2] -> [N_, W_, Q_]
 
         self.legal_inds = legal_moves_array.nonzero()
-        self.move_inds, self.move_texts = move_dict.keys(), move_dict.values()
-        assert ((self.legal_inds == self.move_inds).all())
-        self.edges[legal_inds,3] = probabilities[legal_inds] # [3] -> [P_]
+        self.move_inds, self.move_texts = list(move_dict.keys()), list(move_dict.values())
+        self.move_dict = move_dict
+        #print(self.legal_inds, self.move_inds)
+        #assert ((self.legal_inds == self.move_inds))
+        self.edges_[self.legal_inds,3] = probabilities[self.legal_inds] # [3] -> [P_]
 
     def __getitem__(self, key):
         return TraversedEdge(self, key)
@@ -278,6 +301,7 @@ class Node:
         and evaluation of value of the node (V_)
         '''
         self.board_ = board # state of the chess env
+        self.s = board.fen()
         self.parent_edge_ = parent_edge # None value idicates that the node is starting game node
         #root nodes should otherwise still have parent edges to access its value for stop condition
         self.children_edges_ = [] # list of edges nodes
@@ -297,11 +321,11 @@ class Node:
         del self.parent_edge_
         # print("destruct node")
 
-    def getChildrenEdges(self, NN, device):
+    def getChildrenEdges(self, NN, move_count_dict, device):
         '''
         obtains all the children nodes from interacting with the chess env
         '''
-        board_state_string = self.board_.fen()
+        board_state_string = self.s
         state_array = input_state(board_state_string) #turn into arrays for NN
         is_black = not is_white(board_state_string)
         legal_moves_array, move_dict = return_legal_moves(self.board_, is_black)
@@ -309,17 +333,24 @@ class Node:
         # print("legal array shape: ", legal_moves_array.shape)
         # print(type(legal_moves_array))
         P, _ = (NN.run(state_array, legal_moves_array, device=device)) # P.shape is (1, 4672)
+        P = P.cpu().data.numpy()
         # print("P shape: ", P.shape)
-        """
+
 
         # UNCOMMENT THIS MULTI LINE COMMENT TO ACTIVATE VECTORIZED EDGE PROCESSING
 
         # __init__(self, size, parent_node, legal_moves_array, probabilities, move_dict)
-        self.children_edges_ = ChildrenEdgeDict(4672, self,legal_moves_array, P, move_dict)
+        self.children_edges_ = ChildrenEdgeDict(4672, self,legal_moves_array, P, move_dict, move_count_dict)
+        if (board_state_string in move_count_dict.keys()):
+            edges = move_count_dict[board_state_string]
+            arr = self.children_edges_.edges_
+            inds = edges.keys()
+            for i in range(len(edges.keys())):
+                arr[int(inds[i])] = edges[inds[i]]
 
         """
-        """
         # BEGIN OF OLD NONVECTORIZED CODE
+        """
         """
         for idx in range(4672): #as the legal_moves_array.shape is (1, 4672)
             if legal_moves_array[0, idx] != 0:
@@ -327,6 +358,7 @@ class Node:
                 edge = Edge(self, P[0, idx], idx, move_dict[idx])
                 # print("ege: ", edge)
                 self.children_edges_.append(edge)
+        """
         """
         # END OF OLD NONVECTORIZED CODE
         """
@@ -346,15 +378,16 @@ class Node:
             print("children nodes not initialized")
             return None
 
-        """
+
 
         # UNCOMMENT THIS MULTI LINE COMMENT TO ACTIVATE VECTORIZED EDGE PROCESSING
-        arr = self.children_edges_.edges
+        arr = self.children_edges_.edges_
         [N_child, W, Q, P] = arr.transpose()
 
-        """
+
         """
         # BEGIN OF OLD NONVECTORIZED CODE
+        """
         """
         Q = []# initialize to obtain Q values
         N_child = [] # initialize to obtain N of each child
@@ -367,6 +400,7 @@ class Node:
         N_child = np.array(N_child)
         P = np.array(P)
         """
+        """
         # END OF OLD NONVECTORIZED CODE
         """
         if self_play:
@@ -375,9 +409,10 @@ class Node:
             P = (1- eps)*P + eps*np.random.dirichlet(0.3 * np.ones(P.shape)) #add dirichlet noise if self play
             # print("P after dirichlet: ", P)
             #dirichlet parameter is 0.3 for chess from https://medium.com/oracledevs/lessons-from-alphazero-part-3-parameter-tweaking-4dceb78ed1e5
-        N_all = np.sum(N_child)
+        N_all = np.sum(N_child) + 1
         U = c_puct* P* np.sqrt(N_all)/ (1 + N_child) #obtain the U values
         selected_child_idx = np.argmax(Q+U)
+        print(selected_child_idx)
         return selected_child_idx
 
 class ResidualBlock(nn.Module):
