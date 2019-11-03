@@ -5,6 +5,7 @@ from chess_env import input_state, is_white, return_legal_moves
 import chess
 import random
 import math
+import time
 
 #TO DO: add virtual loss variable in backup see pg.22
 
@@ -220,9 +221,8 @@ class TraversedEdge:
         self.ind = ind
         self.parent_node_ = edge_dict.parent_node
         self.child_node_ = child_node
-        self.N_, self.W_, self.W_, self.P_ = self.edge_dict.edges_[ind]
+        self.N_, self.V_, self.W_, self.P_ = self.edge_dict.edges_[ind]
         self.move_idx_ = ind
-        print(self.edge_dict.move_dict, ind)
         self.move_text_ = self.edge_dict.move_dict[ind]
 
         """
@@ -232,6 +232,8 @@ class TraversedEdge:
 
     def rollback(self, value, move_count_dict):
 
+        if (self.parent_node_ == None):
+            return
         dict_in = self.parent_node_.s # + " WITH ACTION " + str(self.ind)
 
         if (dict_in not in move_count_dict.keys()):
@@ -248,9 +250,9 @@ class TraversedEdge:
             self.edge_dict.edges_[self.ind,0] = N
             self.edge_dict.edges_[self.ind,1] = V
             self.edge_dict.edges_[self.ind,2] = W
-        if self.parent_node != None:
+        if self.parent_node_ != None and self.parent_node_.parent_edge_ != None:
             self.parent_node_.parent_edge_.rollback(value, move_count_dict)
-        self.N_, self.W_, self.W_, self.P_ = self.edge_dict.edges_[ind]
+        self.N_, self.V_, self.W_, self.P_ = self.edge_dict.edges_[self.ind]
 
 
 
@@ -281,6 +283,7 @@ class ChildrenEdgeDict:
 
         self.legal_inds = legal_moves_array.nonzero()
         self.move_inds, self.move_texts = list(move_dict.keys()), list(move_dict.values())
+        #print(list(self.legal_inds))
         self.move_dict = move_dict
         #print(self.legal_inds, self.move_inds)
         #assert ((self.legal_inds == self.move_inds))
@@ -329,11 +332,15 @@ class Node:
         state_array = input_state(board_state_string) #turn into arrays for NN
         is_black = not is_white(board_state_string)
         legal_moves_array, move_dict = return_legal_moves(self.board_, is_black)
+        self.move_dict = move_dict
         # print("state array shape: ", state_array.shape)
         # print("legal array shape: ", legal_moves_array.shape)
         # print(type(legal_moves_array))
+        t1 = time.time()
         P, _ = (NN.run(state_array, legal_moves_array, device=device)) # P.shape is (1, 4672)
         P = P.cpu().data.numpy()
+        t2 = time.time()
+        #print("forward time: %f" % (time.time() - t1))
         # print("P shape: ", P.shape)
 
 
@@ -382,7 +389,8 @@ class Node:
 
         # UNCOMMENT THIS MULTI LINE COMMENT TO ACTIVATE VECTORIZED EDGE PROCESSING
         arr = self.children_edges_.edges_
-        [N_child, W, Q, P] = arr.transpose()
+        valid_moves = list(self.move_dict.keys())
+        [N_child, W, Q, P] = arr[valid_moves].transpose()
 
 
         """
@@ -411,9 +419,9 @@ class Node:
             #dirichlet parameter is 0.3 for chess from https://medium.com/oracledevs/lessons-from-alphazero-part-3-parameter-tweaking-4dceb78ed1e5
         N_all = np.sum(N_child) + 1
         U = c_puct* P* np.sqrt(N_all)/ (1 + N_child) #obtain the U values
+        #print(list(Q+U), list(P))
         selected_child_idx = np.argmax(Q+U)
-        print(selected_child_idx)
-        return selected_child_idx
+        return valid_moves[selected_child_idx]
 
 class ResidualBlock(nn.Module):
     def __init__(self, num_features):

@@ -24,10 +24,10 @@ def tree_search(node, NN, remain_iter, c_puct, self_play, move_count_dict, devic
             node.getChildrenEdges(NN, move_count_dict, device=device)#expand children edges
             # print("children edges size: ", len(node.children_edges_))
             # print("children edges expanded")
-        print("getChildrenEdges: %f" % (time.time() - t1))
+        #print("getChildrenEdges: %f" % (time.time() - t1))
         t2 = time.time()
         select_idx = node.select(c_puct, self_play)
-        print("select_idx: %f" % (time.time()-t2))
+        #print("select_idx: %f" % (time.time()-t2))
         selected_edge = node.children_edges_[select_idx]
         if selected_edge.child_node_ == None: #check if the edge has child node. if it doesn't, initiate node
             new_board = node.board_.copy()
@@ -35,7 +35,7 @@ def tree_search(node, NN, remain_iter, c_puct, self_play, move_count_dict, devic
             new_board.push(edge_move)
             # print("picked move: ", selected_edge.move_text_)
             selected_edge.child_node_ = Node(new_board, parent_edge = selected_edge)
-        print("One search iter: %f. remain iter: %d " % (time.time()-t1, remain_iter))
+        #print("One search iter: %f. remain iter: %d " % (time.time()-t1, remain_iter))
         tree_search(selected_edge.child_node_, NN, remain_iter-1, c_puct, self_play, move_count_dict, device=device)
 
 def pickMove(node, temp, archive, v_resign):
@@ -68,7 +68,10 @@ def pickMove(node, temp, archive, v_resign):
     N_vector = [] # vector of N^(1/temp) values of all children
     N_vector_array = np.zeros(4672)
     # print("node.children_edges_ length: ",len(node.children_edges_))
-    for child_edge in node.children_edges_:
+    move_dict = node.children_edges_.move_dict
+    keys = list(move_dict)
+    for i in move_dict.keys():
+        child_edge = node.children_edges_[i]
         # print("child_edge.N_: ",child_edge.N_)
         value = child_edge.N_**(1/temp)
         # print("value: ", value)
@@ -82,15 +85,15 @@ def pickMove(node, temp, archive, v_resign):
     archive.append([node.state_, N_vector_array, white_turn, None]) # before picking the move, add data to archive. The winner is added later
     # print("N_vector shape: ", N_vector.shape)
 
-    next_edge_idx = np.random.choice([value for value in range(N_vector.shape[0])], p = N_vector)
+    next_edge_idx = np.random.choice(np.arange(N_vector.shape[0]), p = N_vector)
     # next_move_arg picks the index of the N_vector according to its probability distribution
-    next_move_edge = node.children_edges_[next_edge_idx] # picks the next child
-    if next_move_edge.child_node_ == None: #check if the edge has child node. if it doesn't, initiate node
-        new_board = node.board_.board.copy()
+    selected_edge = node.children_edges_[keys[next_edge_idx]] # picks the next child
+    if selected_edge.child_node_ == None: #check if the edge has child node. if it doesn't, initiate node
+        new_board = node.board_.copy()
         edge_move = chess.Move.from_uci(selected_edge.move_text_)
         new_board.push(edge_move)
-        next_move_edge.child_node_ = Node(new_board, selected_edge)
-    new_node = next_move_edge.child_node_
+        selected_edge.child_node_ = Node(new_board, selected_edge)
+    new_node = selected_edge.child_node_
     del node # destruct the old parent node
     new_node.parent_edge_.parent_node_ = None #the child node is now root node, thus its parent edge points to none
     # print("check new node pointer: ", next_move_edge.child_node_.parent_edge_.parent_node_ == None)
@@ -123,8 +126,8 @@ def test( white, black, v_resign = None, self_play = True, device="cpu"):
     c_puct = 0.5
     MCTS_iter = 25 # how deep we do MCTS
     board = chess.Board() # initialize new game
-    start_edge = Edge(None, 0, 0, "a0b1") #initialize edge to notify starting node as root. a0b1 here doesn't mean anything
-    current_node = Node(board, start_edge) #initialize node
+    #start_edge = Edge(None, 0, 0, "a0b1") #initialize edge to notify starting node as root. a0b1 here doesn't mean anything
+    current_node = Node(board, None) #initialize node
     archive = [] #initialize archive
     done = False
     num_steps = 0
@@ -147,14 +150,14 @@ def test( white, black, v_resign = None, self_play = True, device="cpu"):
         move_count_dict = {}
         tree_search(current_node, network, MCTS_iter, c_puct, self_play, move_count_dict, device=device)
         t2 = time.time()
-        print("One iter of tree_search: %f" % (t2-t1))
+        #print("One iter of tree_search: %f" % (t2-t1))
         # if stop_condition(current_node, 0.5):
         #     done = True
         #     break
         # print("temp: ", temp)
         t1 = time.time()
         current_node = pickMove(current_node, temp, archive, v_resign)
-        print("Move pick: %f" % (time.time()-t1))
+        #print("Move pick: %f" % (time.time()-t1))
         if current_node == "resign":
             resign = True
             print("resign game")
@@ -248,8 +251,8 @@ def play_with_human(board, network, device="cpu", v_resign = None, self_play = F
     """
     c_puct = 0.5
     MCTS_iter = 25 # how deep we do MCTS
-    start_edge = Edge(None, 0, 0, "a0b1") #initialize edge to notify starting node as root. a0b1 here doesn't mean anything
-    current_node = Node(board, start_edge) #initialize node
+    #start_edge = Edge(None, 0, 0, "a0b1") #initialize edge to notify starting node as root. a0b1 here doesn't mean anything
+    current_node = Node(board, None) #initialize node
     done = False
     temp = 0.01 #when test is used for evaluation, temp starts very small
     if current_node == "resign":
